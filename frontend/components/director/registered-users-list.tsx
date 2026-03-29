@@ -7,9 +7,14 @@ import { Button } from "@/components/ui/button"
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Select,
   SelectContent,
@@ -28,6 +33,9 @@ type MandatoryDeliverableRow = {
   note: string
   link: string
   submitted_at: string
+  director_note?: string
+  director_link?: string
+  corrected_at?: string
 }
 
 type UserDetail = {
@@ -322,6 +330,14 @@ export function RegisteredUsersList() {
   const [detailError, setDetailError] = useState<string | null>(null)
   const [phaseUpdating, setPhaseUpdating] = useState(false)
   const [initClientLoading, setInitClientLoading] = useState(false)
+  const [correctionFor, setCorrectionFor] = useState<{
+    slug: string
+    label: string
+  } | null>(null)
+  const [corrNote, setCorrNote] = useState("")
+  const [corrLink, setCorrLink] = useState("")
+  const [corrSaving, setCorrSaving] = useState(false)
+  const [corrErr, setCorrErr] = useState<string | null>(null)
 
   const fetchDetail = useCallback(async (email: string) => {
     setDetailLoading(true)
@@ -360,6 +376,18 @@ export function RegisteredUsersList() {
     fetchDetail(viewEmail)
   }, [viewEmail, fetchDetail])
 
+  useEffect(() => {
+    if (!correctionFor || !detail?.client?.mandatory_task_deliverables) {
+      setCorrNote("")
+      setCorrLink("")
+      return
+    }
+    const row = detail.client.mandatory_task_deliverables[correctionFor.slug]
+    setCorrNote(row?.director_note ?? "")
+    setCorrLink(row?.director_link ?? "")
+    setCorrErr(null)
+  }, [correctionFor, detail?.client?.mandatory_task_deliverables])
+
   const handlePhaseChange = async (newPhase: string) => {
     if (!detail || !viewEmail) return
     setPhaseUpdating(true)
@@ -392,6 +420,42 @@ export function RegisteredUsersList() {
       /* ignore */
     } finally {
       setInitClientLoading(false)
+    }
+  }
+
+  const handleSubmitDeliverableCorrection = async () => {
+    if (!viewEmail || !correctionFor) return
+    const note = corrNote.trim()
+    const link = corrLink.trim()
+    if (!note && !link) {
+      setCorrErr("Agregá un comentario o un enlace.")
+      return
+    }
+    setCorrErr(null)
+    setCorrSaving(true)
+    try {
+      const res = await apiFetch("/users/mandatory-deliverables/director-feedback", {
+        method: "PUT",
+        body: JSON.stringify({
+          student_email: viewEmail,
+          task_slug: correctionFor.slug,
+          director_note: note || undefined,
+          director_link: link || undefined,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as { detail?: string }
+      if (!res.ok) {
+        setCorrErr(
+          typeof data.detail === "string" ? data.detail : "No se pudo enviar la corrección"
+        )
+        return
+      }
+      setCorrectionFor(null)
+      await fetchDetail(viewEmail)
+    } catch {
+      setCorrErr("Error de conexión")
+    } finally {
+      setCorrSaving(false)
     }
   }
 
@@ -589,6 +653,46 @@ export function RegisteredUsersList() {
                                     timeStyle: "short",
                                   })}
                                 </p>
+                                {(row.director_note || row.director_link) &&
+                                row.corrected_at ? (
+                                  <div className="mt-2 rounded-md border border-amber-500/30 bg-amber-500/5 px-2 py-2">
+                                    <p className="text-[10px] uppercase tracking-wide text-amber-200/80 mb-1">
+                                      Última corrección al alumno
+                                    </p>
+                                    {row.director_note ? (
+                                      <p className="text-[12px] text-zinc-200 whitespace-pre-wrap">
+                                        {row.director_note}
+                                      </p>
+                                    ) : null}
+                                    {row.director_link ? (
+                                      <a
+                                        href={row.director_link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[11px] text-purple-300 underline mt-1 inline-block"
+                                      >
+                                        Enlace enviado
+                                      </a>
+                                    ) : null}
+                                    <p className="text-[10px] text-zinc-500 mt-1">
+                                      {new Date(row.corrected_at).toLocaleString("es-AR", {
+                                        dateStyle: "short",
+                                        timeStyle: "short",
+                                      })}
+                                    </p>
+                                  </div>
+                                ) : null}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="mt-2 h-8 border-zinc-600 bg-zinc-900 text-xs text-zinc-100 hover:bg-zinc-800"
+                                  onClick={() =>
+                                    setCorrectionFor({ slug, label: row.label || slug })
+                                  }
+                                >
+                                  Corregir y reenviar al alumno
+                                </Button>
                               </div>
                             ))}
                         </div>
@@ -617,6 +721,75 @@ export function RegisteredUsersList() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!correctionFor}
+        onOpenChange={(open) => {
+          if (!open) setCorrectionFor(null)
+        }}
+      >
+        <DialogContent className="bg-zinc-950 border-zinc-800 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Corregir y reenviar al alumno</DialogTitle>
+            <DialogDescription className="text-zinc-500 text-left">
+              El alumno verá esto en su tarea y recibirá una notificación en la app.
+            </DialogDescription>
+          </DialogHeader>
+          {correctionFor ? (
+            <p className="text-sm font-medium text-white uppercase tracking-wide -mt-1 mb-2">
+              {correctionFor.label}
+            </p>
+          ) : null}
+          <div className="grid gap-3 py-1">
+            <div className="grid gap-1.5">
+              <Label htmlFor="corr-note" className="text-zinc-300 text-xs">
+                Comentario / indicaciones
+              </Label>
+              <Textarea
+                id="corr-note"
+                value={corrNote}
+                onChange={(e) => setCorrNote(e.target.value)}
+                rows={4}
+                placeholder="Qué debe ajustar o mejorar…"
+                className="resize-y bg-zinc-900 border-zinc-700 text-white text-sm"
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="corr-link" className="text-zinc-300 text-xs">
+                Enlace (opcional)
+              </Label>
+              <Input
+                id="corr-link"
+                value={corrLink}
+                onChange={(e) => setCorrLink(e.target.value)}
+                type="text"
+                inputMode="url"
+                placeholder="https://..."
+                className="h-10 bg-zinc-900 border-zinc-700 text-white text-sm"
+              />
+            </div>
+            {corrErr ? <p className="text-sm text-red-400">{corrErr}</p> : null}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-zinc-600 text-white bg-transparent"
+              onClick={() => setCorrectionFor(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              disabled={corrSaving}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              onClick={() => void handleSubmitDeliverableCorrection()}
+            >
+              {corrSaving ? "Enviando…" : "Enviar al alumno"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

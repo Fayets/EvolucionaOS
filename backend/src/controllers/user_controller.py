@@ -3,11 +3,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from src import schemas
-from src.controllers.auth_controller import get_current_user
+from src.controllers.auth_controller import get_current_user, get_staff_user
 from src.models import Role
 from src.services.activation_task_services import ActivationTaskService
 from src.services.client_services import ClientService
 from src.services.user_services import UsersService
+from src.notifications_broadcast import broadcast_to_user
 from src.sse_broadcast import EVENT_ACTIVATION_TASKS_CHANGED, broadcast
 
 logger = logging.getLogger(__name__)
@@ -250,6 +251,33 @@ def submit_mandatory_deliverable(
         raise
     except Exception:
         raise HTTPException(status_code=500, detail="Error al guardar el entregable")
+
+
+@router.put("/mandatory-deliverables/director-feedback")
+def submit_deliverable_director_feedback(
+    payload: schemas.MandatoryDeliverableDirectorFeedbackRequest,
+    request: Request,
+    _staff=Depends(get_staff_user),
+):
+    try:
+        client_service.set_mandatory_task_deliverable_director_feedback(
+            str(payload.student_email),
+            payload.task_slug,
+            payload.director_note,
+            payload.director_link,
+        )
+        em = str(payload.student_email).strip()
+        loop = request.app.state.loop
+        loop.call_soon_threadsafe(
+            lambda e=em: broadcast_to_user(e, {"type": "new_notification"})
+        )
+        return {"message": "Corrección enviada al alumno", "success": True}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(
+            status_code=500, detail="Error al enviar la corrección al alumno"
+        )
 
 
 @router.get("/clients")

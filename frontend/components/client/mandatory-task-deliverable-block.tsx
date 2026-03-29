@@ -12,6 +12,9 @@ export type MandatoryDeliverableEntry = {
   note: string
   link: string
   submitted_at: string
+  director_note?: string
+  director_link?: string
+  corrected_at?: string
 }
 
 type Props = {
@@ -37,7 +40,7 @@ export function MandatoryTaskDeliverableBlock({
   useEffect(() => {
     setNote(stored?.note ?? "")
     setLink(stored?.link ?? "")
-  }, [stored?.submitted_at, stored?.note, stored?.link])
+  }, [stored?.submitted_at, stored?.note, stored?.link, stored?.corrected_at])
 
   const submit = async () => {
     setErr(null)
@@ -88,6 +91,34 @@ export function MandatoryTaskDeliverableBlock({
             timeStyle: "short",
           })}
         </p>
+      ) : null}
+      {(stored?.director_note || stored?.director_link) && stored?.corrected_at ? (
+        <div className="mb-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-amber-200/95 mb-1.5">
+            Corrección del director
+          </p>
+          {stored.director_note ? (
+            <p className="text-[13px] text-amber-50/95 whitespace-pre-wrap">
+              {stored.director_note}
+            </p>
+          ) : null}
+          {stored.director_link ? (
+            <a
+              href={stored.director_link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-block text-xs text-amber-200 underline mt-1.5 hover:text-amber-100"
+            >
+              Ver enlace de la corrección
+            </a>
+          ) : null}
+          <p className="text-[10px] text-amber-200/60 mt-1.5">
+            {new Date(stored.corrected_at).toLocaleString("es-AR", {
+              dateStyle: "short",
+              timeStyle: "short",
+            })}
+          </p>
+        </div>
       ) : null}
       <div className="flex flex-col gap-2">
         <div className="grid gap-1">

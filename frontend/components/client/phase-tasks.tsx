@@ -44,13 +44,20 @@ function parseDeliverablesMap(raw: unknown): Record<string, MandatoryDeliverable
       "submitted_at" in v &&
       typeof (v as MandatoryDeliverableEntry).submitted_at === "string"
     ) {
-      const e = v as MandatoryDeliverableEntry
-      out[k] = {
+      const e = v as MandatoryDeliverableEntry & Record<string, unknown>
+      const row: MandatoryDeliverableEntry = {
         label: String(e.label ?? ""),
         note: String(e.note ?? ""),
         link: String(e.link ?? ""),
         submitted_at: e.submitted_at,
       }
+      if (typeof e.director_note === "string" && e.director_note)
+        row.director_note = e.director_note
+      if (typeof e.director_link === "string" && e.director_link)
+        row.director_link = e.director_link
+      if (typeof e.corrected_at === "string" && e.corrected_at)
+        row.corrected_at = e.corrected_at
+      out[k] = row
     }
   }
   return out

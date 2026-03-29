@@ -188,6 +188,70 @@ class ClientService:
                     status_code=500, detail="Error al guardar el entregable"
                 )
 
+    def set_mandatory_task_deliverable_director_feedback(
+        self,
+        student_email: str,
+        task_slug: str,
+        director_note: str | None,
+        director_link: str | None,
+    ) -> None:
+        with db_session:
+            try:
+                dn = (director_note or "").strip()
+                dl = (director_link or "").strip()
+                if not dn and not dl:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Agregá un comentario o un enlace para la corrección",
+                    )
+                user = models.User.get(email=student_email)
+                if not user:
+                    raise HTTPException(status_code=404, detail="Usuario no encontrado")
+                client = models.Client.get(user=user)
+                if not client:
+                    raise HTTPException(status_code=404, detail="Cliente no encontrado")
+                raw = getattr(client, "mandatory_task_deliverables", None)
+                existing = _parse_json(raw)
+                if not isinstance(existing, dict):
+                    existing = {}
+                slug_key = task_slug.strip()
+                entry = existing.get(slug_key)
+                if not isinstance(entry, dict):
+                    raise HTTPException(
+                        status_code=404,
+                        detail="El alumno aún no envió un entregable para esta tarea",
+                    )
+                merged = dict(entry)
+                merged["director_note"] = dn
+                merged["director_link"] = dl
+                merged["corrected_at"] = (
+                    datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+                )
+                existing[slug_key] = merged
+                client.mandatory_task_deliverables = json.dumps(
+                    existing, ensure_ascii=False
+                )
+                task_title = str(merged.get("label") or slug_key)
+                body_parts: list[str] = []
+                if dn:
+                    body_parts.append(dn)
+                if dl:
+                    body_parts.append(f"Enlace: {dl}")
+                body = "\n\n".join(body_parts)
+                if len(body) > 900:
+                    body = body[:897] + "..."
+                models.Notification(
+                    user=user,
+                    title=f"Corrección del entregable: «{task_title}»",
+                    body=body,
+                )
+            except HTTPException:
+                raise
+            except Exception:
+                raise HTTPException(
+                    status_code=500, detail="Error al guardar la corrección"
+                )
+
     def get_clients_list(self) -> list[dict]:
         with db_session:
             try:

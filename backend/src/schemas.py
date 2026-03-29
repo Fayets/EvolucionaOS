@@ -82,6 +82,13 @@ class MandatoryDeliverableSubmitRequest(BaseModel):
     link: str | None = None
 
 
+class MandatoryDeliverableDirectorFeedbackRequest(BaseModel):
+    student_email: EmailStr
+    task_slug: str = Field(min_length=1)
+    director_note: str | None = None
+    director_link: str | None = None
+
+
 # ─── Activation Tasks ───────────────────────────────────────────────
 
 class SkoolClickRequest(BaseModel):
