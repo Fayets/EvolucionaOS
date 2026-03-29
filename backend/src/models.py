@@ -39,6 +39,8 @@ class Client(db.Entity):
     email = Optional(str)
     # JSON: dict con respuestas del formulario de onboarding (claves q1, q2, ...)
     onboarding_responses = Optional(str)
+    # JSON: { task_slug: { label, note, link, submitted_at } } entregables por tarea obligatoria
+    mandatory_task_deliverables = Optional(str)
     created_at = Required(datetime, default=datetime.utcnow)
     updated_at = Required(datetime, default=datetime.utcnow)
 

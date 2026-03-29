@@ -1,17 +1,27 @@
+import logging
 from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from src import schemas
-from src.models import Role
-from src.services.user_services import UsersService
-from src.services.client_services import ClientService
-from src.services.activation_task_services import ActivationTaskService
 from src.controllers.auth_controller import get_current_user
-from src.sse_broadcast import broadcast, EVENT_ACTIVATION_TASKS_CHANGED
+from src.models import Role
+from src.services.activation_task_services import ActivationTaskService
+from src.services.client_services import ClientService
+from src.services.user_services import UsersService
+from src.sse_broadcast import EVENT_ACTIVATION_TASKS_CHANGED, broadcast
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 user_service = UsersService()
 client_service = ClientService()
 activation_service = ActivationTaskService()
+
+
+def _ensure_may_access_client_email(current_user, email: str) -> None:
+    if getattr(current_user, "role", None) == Role.CLIENTE:
+        if (email or "").strip().lower() != (current_user.email or "").strip().lower():
+            raise HTTPException(status_code=403, detail="No autorizado")
 
 # Transiciones que el cliente puede aplicar solo (sin aprobación del director)
 _CLIENT_SELF_PHASE_MOVES = {("platforms", "Acceso")}
@@ -171,6 +181,7 @@ def get_onboarding(
     current_user=Depends(get_current_user),
 ):
     try:
+        _ensure_may_access_client_email(current_user, email)
         data = client_service.get_onboarding_responses(email)
         return {"responses": data or {}}
     except HTTPException:
@@ -185,12 +196,60 @@ def submit_onboarding(
     current_user=Depends(get_current_user),
 ):
     try:
+        _ensure_may_access_client_email(current_user, payload.email)
         client_service.set_onboarding_responses(payload.email, payload.responses)
         return {"message": "Onboarding guardado correctamente", "success": True}
     except HTTPException as e:
         return {"message": e.detail, "success": False}
     except Exception:
         return {"message": "Error inesperado al guardar onboarding.", "success": False}
+
+
+@router.get("/mandatory-deliverables")
+def get_mandatory_deliverables(
+    email: str = Query(..., description="Email del cliente"),
+    current_user=Depends(get_current_user),
+):
+    _ensure_may_access_client_email(current_user, email)
+    try:
+        data = client_service.get_mandatory_task_deliverables(email)
+        return {"deliverables": data}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener entregables")
+
+
+@router.put("/mandatory-deliverables")
+def submit_mandatory_deliverable(
+    payload: schemas.MandatoryDeliverableSubmitRequest,
+    request: Request,
+    current_user=Depends(get_current_user),
+):
+    _ensure_may_access_client_email(current_user, payload.email)
+    try:
+        client_service.set_mandatory_task_deliverable(
+            payload.email,
+            payload.task_slug,
+            payload.task_label,
+            payload.note,
+            payload.link,
+        )
+        try:
+            activation_service.create_deliverable_submitted_task(
+                payload.email,
+                payload.task_label,
+                payload.task_slug,
+            )
+        except Exception:
+            logger.exception("create_deliverable_submitted_task")
+        loop = request.app.state.loop
+        loop.call_soon_threadsafe(lambda: broadcast(EVENT_ACTIVATION_TASKS_CHANGED))
+        return {"message": "Entregable guardado correctamente", "success": True}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al guardar el entregable")
 
 
 @router.get("/clients")

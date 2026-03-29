@@ -23,6 +23,13 @@ import { apiFetch } from "@/lib/api"
 import { CLIENT_PHASES } from "@/lib/phases"
 import { Check, Circle } from "lucide-react"
 
+type MandatoryDeliverableRow = {
+  label: string
+  note: string
+  link: string
+  submitted_at: string
+}
+
 type UserDetail = {
   id: number
   email: string
@@ -34,6 +41,7 @@ type UserDetail = {
     phone: string | null
     email: string | null
     onboarding_responses: Record<string, string> | null
+    mandatory_task_deliverables: Record<string, MandatoryDeliverableRow> | null
   } | null
 }
 
@@ -540,6 +548,52 @@ export function RegisteredUsersList() {
                     <p className="text-zinc-400 font-medium mb-3">Progreso de tareas</p>
                     <TaskProgress email={detail.email} phase={detail.client.phase} />
                   </div>
+
+                  {detail.client.mandatory_task_deliverables &&
+                    Object.keys(detail.client.mandatory_task_deliverables).length > 0 && (
+                      <div className="border-t border-zinc-800 pt-3 mt-3">
+                        <p className="text-zinc-400 font-medium mb-2">Entregables enviados</p>
+                        <div className="flex flex-col gap-3">
+                          {[...Object.entries(detail.client.mandatory_task_deliverables)]
+                            .sort(
+                              (a, b) =>
+                                new Date(b[1].submitted_at).getTime() -
+                                new Date(a[1].submitted_at).getTime()
+                            )
+                            .map(([slug, row]) => (
+                              <div
+                                key={slug}
+                                className="rounded-lg border border-zinc-700 bg-zinc-900/50 px-3 py-2.5"
+                              >
+                                <p className="text-[13px] font-medium text-white uppercase tracking-wide">
+                                  {row.label || slug}
+                                </p>
+                                {row.note ? (
+                                  <p className="text-[13px] text-zinc-300 mt-1.5 whitespace-pre-wrap">
+                                    {row.note}
+                                  </p>
+                                ) : null}
+                                {row.link ? (
+                                  <a
+                                    href={row.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-block text-xs text-purple-300 underline mt-1.5 hover:text-purple-200"
+                                  >
+                                    Abrir enlace del alumno
+                                  </a>
+                                ) : null}
+                                <p className="text-[11px] text-zinc-500 mt-1.5">
+                                  {new Date(row.submitted_at).toLocaleString("es-AR", {
+                                    dateStyle: "short",
+                                    timeStyle: "short",
+                                  })}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
 
                   {/* Onboarding PDF */}
                   {detail.client.onboarding_responses &&

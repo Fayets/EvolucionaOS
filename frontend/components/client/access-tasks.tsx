@@ -9,6 +9,11 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
+import {
+  MandatoryTaskDeliverableBlock,
+  type MandatoryDeliverableEntry,
+} from "@/components/client/mandatory-task-deliverable-block"
+
 const PHASE_ACCESO = "Acceso"
 
 interface TaskFromApi {
@@ -29,6 +34,28 @@ interface ParticularTaskFromApi {
   completed: boolean
 }
 
+function parseDeliverablesMap(raw: unknown): Record<string, MandatoryDeliverableEntry> {
+  if (!raw || typeof raw !== "object") return {}
+  const out: Record<string, MandatoryDeliverableEntry> = {}
+  for (const [k, v] of Object.entries(raw)) {
+    if (
+      v &&
+      typeof v === "object" &&
+      "submitted_at" in v &&
+      typeof (v as MandatoryDeliverableEntry).submitted_at === "string"
+    ) {
+      const e = v as MandatoryDeliverableEntry
+      out[k] = {
+        label: String(e.label ?? ""),
+        note: String(e.note ?? ""),
+        link: String(e.link ?? ""),
+        submitted_at: e.submitted_at,
+      }
+    }
+  }
+  return out
+}
+
 export function AccessTasks() {
   const { userEmail, setClientPhase } = useApp()
   const [tasks, setTasks] = useState<TaskFromApi[]>([])
@@ -36,6 +63,24 @@ export function AccessTasks() {
   const [completedSlugs, setCompletedSlugs] = useState<Set<string>>(new Set())
   const [phaseCompleted, setPhaseCompleted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [submittedDeliverables, setSubmittedDeliverables] = useState<
+    Record<string, MandatoryDeliverableEntry>
+  >({})
+
+  const fetchDeliverables = useCallback(async () => {
+    if (!userEmail) return
+    try {
+      const res = await apiFetch(
+        `/users/mandatory-deliverables?email=${encodeURIComponent(userEmail)}`
+      )
+      if (res.ok) {
+        const data = await res.json()
+        setSubmittedDeliverables(parseDeliverablesMap(data.deliverables))
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [userEmail])
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -89,10 +134,11 @@ export function AccessTasks() {
       await fetchTasks()
       await fetchCompletion()
       await fetchParticularTasks()
+      await fetchDeliverables()
       setLoading(false)
     }
     load()
-  }, [fetchTasks, fetchCompletion, fetchParticularTasks])
+  }, [fetchTasks, fetchCompletion, fetchParticularTasks, fetchDeliverables])
 
   // Actualizar la lista de tareas cuando llega una notificación (ej. nueva tarea particular)
   useEffect(() => {
@@ -100,10 +146,11 @@ export function AccessTasks() {
       fetchTasks()
       fetchCompletion()
       fetchParticularTasks()
+      void fetchDeliverables()
     }
     window.addEventListener(CLIENT_NOTIFICATIONS_CHANGED, refreshTasks)
     return () => window.removeEventListener(CLIENT_NOTIFICATIONS_CHANGED, refreshTasks)
-  }, [fetchTasks, fetchCompletion, fetchParticularTasks])
+  }, [fetchTasks, fetchCompletion, fetchParticularTasks, fetchDeliverables])
 
   const toggleMandatoryTask = async (slug: string) => {
     const newCompleted = !completedSlugs.has(slug)
@@ -266,55 +313,66 @@ export function AccessTasks() {
                     <div className="space-y-4">
                       {tasks.map(task => {
                         const hasClass = Boolean(task.link_url?.trim())
-                        const deliverables = (task.deliverable_links ?? []).filter(Boolean)
+                        const templateDeliverableUrls = (task.deliverable_links ?? []).filter(Boolean)
                         return (
                         <div
                           key={`m-${task.id}`}
-                          className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 bg-zinc-900/70 px-4 py-3"
+                          className="flex flex-col gap-0 rounded-lg border border-zinc-700 bg-zinc-900/70 px-4 py-3"
                         >
-                          <div className="flex flex-col items-start">
-                            <Label
-                              htmlFor={`task-${task.slug}`}
-                              className="text-sm md:text-base cursor-pointer"
-                            >
-                              <span className="uppercase">{task.label}</span>{" "}
-                              <span className="font-semibold text-amber-300">
-                                OBLIGATORIO
-                              </span>
-                            </Label>
-                            <div className="flex flex-col items-start gap-0.5 mt-1">
-                              {hasClass && task.link_url ? (
-                                <a
-                                  href={task.link_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-purple-300 underline text-left hover:text-purple-200"
-                                >
-                                  Ver clase
-                                </a>
-                              ) : null}
-                              {deliverables.map((url, i) => (
-                                <a
-                                  key={`${task.slug}-d-${i}`}
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-fuchsia-300/90 underline text-left hover:text-fuchsia-200"
-                                >
-                                  Entregable {i + 1}
-                                </a>
-                              ))}
-                              {!hasClass && deliverables.length === 0 ? (
-                                <span className="text-xs text-zinc-500">Sin enlaces configurados</span>
-                              ) : null}
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex flex-col items-start min-w-0">
+                              <Label
+                                htmlFor={`task-${task.slug}`}
+                                className="text-sm md:text-base cursor-pointer"
+                              >
+                                <span className="uppercase">{task.label}</span>{" "}
+                                <span className="font-semibold text-amber-300">
+                                  OBLIGATORIO
+                                </span>
+                              </Label>
+                              <div className="flex flex-col items-start gap-0.5 mt-1">
+                                {hasClass && task.link_url ? (
+                                  <a
+                                    href={task.link_url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-purple-300 underline text-left hover:text-purple-200"
+                                  >
+                                    Ver clase
+                                  </a>
+                                ) : null}
+                                {templateDeliverableUrls.map((url, i) => (
+                                  <a
+                                    key={`${task.slug}-d-${i}`}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-fuchsia-300/90 underline text-left hover:text-fuchsia-200"
+                                  >
+                                    Entregable {i + 1}
+                                  </a>
+                                ))}
+                                {!hasClass && templateDeliverableUrls.length === 0 ? (
+                                  <span className="text-xs text-zinc-500">Sin enlaces configurados</span>
+                                ) : null}
+                              </div>
                             </div>
+                            <Checkbox
+                              id={`task-${task.slug}`}
+                              checked={completedSlugs.has(task.slug)}
+                              onCheckedChange={() => toggleMandatoryTask(task.slug)}
+                              className="w-5 h-5 shrink-0 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                            />
                           </div>
-                          <Checkbox
-                            id={`task-${task.slug}`}
-                            checked={completedSlugs.has(task.slug)}
-                            onCheckedChange={() => toggleMandatoryTask(task.slug)}
-                            className="w-5 h-5 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
-                          />
+                          {userEmail ? (
+                            <MandatoryTaskDeliverableBlock
+                              userEmail={userEmail}
+                              taskSlug={task.slug}
+                              taskLabel={task.label}
+                              stored={submittedDeliverables[task.slug]}
+                              onSaved={() => void fetchDeliverables()}
+                            />
+                          ) : null}
                         </div>
                         )
                       })}

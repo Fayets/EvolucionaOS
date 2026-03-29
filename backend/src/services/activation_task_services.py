@@ -134,6 +134,40 @@ class ActivationTaskService:
                 logger.exception("create_phase_advance_request: %s", e)
                 return False, "Error al registrar la solicitud"
 
+    def create_deliverable_submitted_task(
+        self, email: str, task_label: str, task_slug: str
+    ) -> None:
+        """Aviso en el panel de tareas de activación cuando un alumno envía un entregable."""
+        with db_session:
+            try:
+                user = models.User.get(email=email)
+                if not user:
+                    return
+                if user.first_name or user.last_name:
+                    client_name = " ".join(
+                        p for p in [user.first_name, user.last_name] if p
+                    ).strip()
+                else:
+                    client_name = email.split("@")[0].capitalize()
+                client = models.Client.get(user=user)
+                label = (task_label or "").strip() or task_slug
+                task = models.ActivationTask(
+                    client=client,
+                    client_name=client_name,
+                    client_email=email,
+                    description=(
+                        f'Entregable enviado: «{label}». Revisá el perfil del alumno '
+                        f'(sección «Entregables enviados»).'
+                    ),
+                    completed=False,
+                    is_new=True,
+                )
+                task.flush()
+            except HTTPException:
+                raise
+            except Exception as e:
+                logger.exception("create_deliverable_submitted_task: %s", e)
+
     def create_phase_completed_task(self, email: str, phase: str) -> None:
         with db_session:
             try:

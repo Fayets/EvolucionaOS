@@ -149,11 +149,16 @@ class UsersService:
                 client = models.Client.get(user=user)
                 if client:
                     from .client_services import _parse_json
+
+                    md = _parse_json(getattr(client, "mandatory_task_deliverables", None))
+                    if not isinstance(md, dict):
+                        md = None
                     out["client"] = {
                         "phase": client.phase,
                         "phone": client.phone,
                         "email": client.email,
                         "onboarding_responses": _parse_json(client.onboarding_responses),
+                        "mandatory_task_deliverables": md,
                     }
                 else:
                     out["client"] = None

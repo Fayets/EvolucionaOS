@@ -1,5 +1,7 @@
 import json
 import logging
+from datetime import datetime
+
 from fastapi import HTTPException
 from pony.orm import db_session
 from src import models
@@ -117,6 +119,74 @@ class ClientService:
                 raise
             except Exception:
                 raise HTTPException(status_code=500, detail="Error al guardar onboarding")
+
+    def get_mandatory_task_deliverables(self, email: str) -> dict:
+        with db_session:
+            try:
+                user = models.User.get(email=email)
+                if not user:
+                    raise HTTPException(status_code=404, detail="Usuario no encontrado")
+                client = models.Client.get(user=user)
+                if not client:
+                    return {}
+                raw = getattr(client, "mandatory_task_deliverables", None)
+                data = _parse_json(raw)
+                return data if isinstance(data, dict) else {}
+            except HTTPException:
+                raise
+            except Exception:
+                raise HTTPException(
+                    status_code=500, detail="Error al obtener entregables de tareas"
+                )
+
+    def set_mandatory_task_deliverable(
+        self,
+        email: str,
+        task_slug: str,
+        task_label: str,
+        note: str | None,
+        link: str | None,
+    ) -> None:
+        with db_session:
+            try:
+                task = models.MandatoryTask.get(slug=task_slug.strip())
+                if not task:
+                    raise HTTPException(status_code=404, detail="Tarea no encontrada")
+                user = models.User.get(email=email)
+                if not user:
+                    raise HTTPException(status_code=404, detail="Usuario no encontrado")
+                client = models.Client.get(user=user)
+                if not client:
+                    raise HTTPException(
+                        status_code=404, detail="Cliente no encontrado"
+                    )
+                n = (note or "").strip()
+                u = (link or "").strip()
+                if not n and not u:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Agregá un comentario o un enlace al entregable",
+                    )
+                existing = _parse_json(getattr(client, "mandatory_task_deliverables", None))
+                if not isinstance(existing, dict):
+                    existing = {}
+                slug_key = task_slug.strip()
+                existing[slug_key] = {
+                    "label": task_label.strip(),
+                    "note": n,
+                    "link": u,
+                    "submitted_at": datetime.utcnow().replace(microsecond=0).isoformat()
+                    + "Z",
+                }
+                client.mandatory_task_deliverables = json.dumps(
+                    existing, ensure_ascii=False
+                )
+            except HTTPException:
+                raise
+            except Exception:
+                raise HTTPException(
+                    status_code=500, detail="Error al guardar el entregable"
+                )
 
     def get_clients_list(self) -> list[dict]:
         with db_session:

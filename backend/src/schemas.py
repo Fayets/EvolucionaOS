@@ -74,6 +74,14 @@ class OnboardingSubmitRequest(BaseModel):
     responses: dict
 
 
+class MandatoryDeliverableSubmitRequest(BaseModel):
+    email: EmailStr
+    task_slug: str = Field(min_length=1)
+    task_label: str = Field(min_length=1)
+    note: str | None = None
+    link: str | None = None
+
+
 # ─── Activation Tasks ───────────────────────────────────────────────
 
 class SkoolClickRequest(BaseModel):
