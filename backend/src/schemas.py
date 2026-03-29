@@ -62,6 +62,11 @@ class ClientPhaseRequest(BaseModel):
     phase: str
 
 
+class PhaseAdvanceRequest(BaseModel):
+    email: EmailStr
+    next_phase: str
+
+
 # ─── Onboarding ─────────────────────────────────────────────────────
 
 class OnboardingSubmitRequest(BaseModel):
@@ -100,6 +105,7 @@ class AssignMandatoryTaskRequest(BaseModel):
 class MandatoryTaskCreate(BaseModel):
     label: str
     link_url: str | None = None
+    deliverable_links: list[str] = Field(default_factory=list)
     phase: str = "Acceso"
     slug: str | None = None
 
@@ -107,6 +113,7 @@ class MandatoryTaskCreate(BaseModel):
 class MandatoryTaskUpdate(BaseModel):
     label: str | None = None
     link_url: str | None = None
+    deliverable_links: list[str] | None = None
 
 
 # ─── Particular Tasks ───────────────────────────────────────────────

@@ -3,6 +3,7 @@
 import { useApp } from "@/lib/app-context"
 import {
   LayoutDashboard,
+  LayoutGrid,
   UserPlus,
   Users,
   FilePlus,
@@ -11,7 +12,13 @@ import {
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 
-export type DirectorViewId = "tasks" | "register" | "users" | "generateTask" | "settings"
+export type DirectorViewId =
+  | "tasks"
+  | "register"
+  | "users"
+  | "generateTask"
+  | "phases"
+  | "settings"
 
 type DirectorSidebarProps = {
   active: DirectorViewId
@@ -23,6 +30,7 @@ const navItems: { id: DirectorViewId; label: string; icon: LucideIcon }[] = [
   { id: "register", label: "Registrar", icon: UserPlus },
   { id: "users", label: "Usuarios", icon: Users },
   { id: "generateTask", label: "Nueva tarea", icon: FilePlus },
+  { id: "phases", label: "Fases", icon: LayoutGrid },
 ]
 
 function NavButton({

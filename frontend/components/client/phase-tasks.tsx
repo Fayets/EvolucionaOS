@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react"
 import { useApp } from "@/lib/app-context"
 import { apiFetch } from "@/lib/api"
-import { getNextPhase, type PhaseName } from "@/lib/phases"
+import { getNextPhaseOrDone } from "@/lib/phases"
+import { fetchMyClientPhase, requestPhaseAdvance } from "@/lib/phase-advance"
 import { CLIENT_NOTIFICATIONS_CHANGED } from "@/lib/use-client-notifications-sse"
 import { ClientLayoutLogo, ClientSidebar } from "@/components/client-sidebar"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,7 @@ interface TaskFromApi {
   slug: string
   label: string
   link_url: string
+  deliverable_links?: string[]
   order: number | null
   phase: string
 }
@@ -33,7 +35,9 @@ export function PhaseTasks({ phase }: { phase: string }) {
   const [tasks, setTasks] = useState<TaskFromApi[]>([])
   const [particularTasks, setParticularTasks] = useState<ParticularTaskFromApi[]>([])
   const [completedSlugs, setCompletedSlugs] = useState<Set<string>>(new Set())
-  const [phaseCompleted, setPhaseCompleted] = useState(false)
+  const [awaitingDirector, setAwaitingDirector] = useState(false)
+  const [pendingTargetPhase, setPendingTargetPhase] = useState<string | null>(null)
+  const [advanceError, setAdvanceError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const fetchTasks = useCallback(async () => {
@@ -154,27 +158,49 @@ export function PhaseTasks({ phase }: { phase: string }) {
 
   const [finishing, setFinishing] = useState(false)
 
-  const nextPhase = getNextPhase(phase as PhaseName)
+  const nextPhase = getNextPhaseOrDone(phase)
+
+  const trySyncApprovedPhase = useCallback(async () => {
+    if (!pendingTargetPhase || !userEmail) return
+    const serverPhase = await fetchMyClientPhase()
+    if (serverPhase && serverPhase === pendingTargetPhase) {
+      setClientPhase(serverPhase)
+      setAwaitingDirector(false)
+      setPendingTargetPhase(null)
+    }
+  }, [pendingTargetPhase, userEmail, setClientPhase])
+
+  useEffect(() => {
+    if (!awaitingDirector || !pendingTargetPhase) return
+    void trySyncApprovedPhase()
+    window.addEventListener("focus", trySyncApprovedPhase)
+    const onNotify = () => void trySyncApprovedPhase()
+    window.addEventListener(CLIENT_NOTIFICATIONS_CHANGED, onNotify)
+    const interval = setInterval(() => void trySyncApprovedPhase(), 20000)
+    return () => {
+      window.removeEventListener("focus", trySyncApprovedPhase)
+      window.removeEventListener(CLIENT_NOTIFICATIONS_CHANGED, onNotify)
+      clearInterval(interval)
+    }
+  }, [awaitingDirector, pendingTargetPhase, trySyncApprovedPhase])
 
   const handleFinishPhase = async () => {
     if (!userEmail) return
+    const target = nextPhase
+    if (!target) return
+    setAdvanceError(null)
     setFinishing(true)
-    const target = nextPhase ?? "done"
     try {
-      const res = await apiFetch("/users/client-phase", {
-        method: "PUT",
-        body: JSON.stringify({ email: userEmail, phase: target }),
-      })
-      if (res.ok) setPhaseCompleted(true)
-    } catch {
-      /* ignore */
+      const { ok, message } = await requestPhaseAdvance(userEmail, target)
+      if (ok) {
+        setAwaitingDirector(true)
+        setPendingTargetPhase(target)
+      } else {
+        setAdvanceError(message)
+      }
     } finally {
       setFinishing(false)
     }
-  }
-
-  const handleGoToNext = () => {
-    setClientPhase(nextPhase ?? "done")
   }
 
   if (loading) {
@@ -191,7 +217,7 @@ export function PhaseTasks({ phase }: { phase: string }) {
     )
   }
 
-  if (phaseCompleted) {
+  if (awaitingDirector && pendingTargetPhase) {
     return (
       <div className="min-h-screen bg-transparent text-white flex flex-col items-center">
         <ClientLayoutLogo />
@@ -202,24 +228,26 @@ export function PhaseTasks({ phase }: { phase: string }) {
               <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/60 via-fuchsia-500/60 to-purple-500/60 blur-2xl opacity-60" />
               <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
                 <CardContent className="pt-8 pb-8 px-8 text-center">
-                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-6 h-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
+                    <svg className="w-6 h-6 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
                   <h2 className="text-2xl font-semibold mb-2">
-                    Fase &quot;{phase}&quot; completada
+                    Esperando aprobación del director
                   </h2>
                   <p className="text-sm text-zinc-300 mb-6">
-                    {nextPhase
-                      ? `Continuá con la siguiente fase: ${nextPhase}.`
-                      : "Completaste todas las fases del programa."}
+                    {pendingTargetPhase === "done"
+                      ? "Solicitaste cerrar el programa. Cuando tu director apruebe, vas a ver la pantalla final aquí."
+                      : `Solicitaste pasar a la fase «${pendingTargetPhase}». Cuando sea aprobado, vas a continuar automáticamente.`}
                   </p>
                   <Button
-                    onClick={handleGoToNext}
-                    className="w-full max-w-xs mx-auto bg-purple-600 hover:bg-purple-700 text-white rounded-full"
+                    type="button"
+                    variant="outline"
+                    className="rounded-full border border-zinc-600 bg-zinc-900/90 px-8 py-2.5 text-sm font-semibold tracking-wide text-white hover:bg-zinc-800 hover:border-zinc-400 hover:text-white"
+                    onClick={() => void trySyncApprovedPhase()}
                   >
-                    {nextPhase ? `Ir a fase "${nextPhase}"` : "Finalizar"}
+                    ACTUALIZAR
                   </Button>
                 </CardContent>
               </Card>
@@ -250,28 +278,45 @@ export function PhaseTasks({ phase }: { phase: string }) {
                     <p className="text-zinc-400 text-sm">No hay tareas configuradas para esta fase.</p>
                   ) : (
                     <div className="space-y-4">
-                      {tasks.map(task => (
+                      {tasks.map(task => {
+                        const hasClass = Boolean(task.link_url?.trim())
+                        const deliverables = (task.deliverable_links ?? []).filter(Boolean)
+                        return (
                         <div
                           key={`m-${task.id}`}
                           className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 bg-zinc-900/70 px-4 py-3"
                         >
                           <div className="flex flex-col items-start">
                             <Label htmlFor={`task-${task.slug}`} className="text-sm md:text-base cursor-pointer">
-                              {task.label}{" "}
+                              <span className="uppercase">{task.label}</span>{" "}
                               <span className="font-semibold text-amber-300">OBLIGATORIO</span>
                             </Label>
-                            {task.link_url ? (
-                              <a
-                                href={task.link_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-purple-300 underline mt-1 text-left hover:text-purple-200"
-                              >
-                                Ver enlace
-                              </a>
-                            ) : (
-                              <span className="text-xs text-zinc-500 mt-1">Sin enlace configurado</span>
-                            )}
+                            <div className="flex flex-col items-start gap-0.5 mt-1">
+                              {hasClass && task.link_url ? (
+                                <a
+                                  href={task.link_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-purple-300 underline text-left hover:text-purple-200"
+                                >
+                                  Ver clase
+                                </a>
+                              ) : null}
+                              {deliverables.map((url, i) => (
+                                <a
+                                  key={`${task.slug}-d-${i}`}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-fuchsia-300/90 underline text-left hover:text-fuchsia-200"
+                                >
+                                  Entregable {i + 1}
+                                </a>
+                              ))}
+                              {!hasClass && deliverables.length === 0 ? (
+                                <span className="text-xs text-zinc-500">Sin enlaces configurados</span>
+                              ) : null}
+                            </div>
                           </div>
                           <Checkbox
                             id={`task-${task.slug}`}
@@ -280,7 +325,8 @@ export function PhaseTasks({ phase }: { phase: string }) {
                             className="w-5 h-5 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
                           />
                         </div>
-                      ))}
+                        )
+                      })}
                       {particularTasks.map(task => (
                         <div
                           key={`p-${task.id}`}
@@ -288,8 +334,8 @@ export function PhaseTasks({ phase }: { phase: string }) {
                         >
                           <div className="flex flex-col items-start">
                             <Label htmlFor={`particular-${task.id}`} className="text-sm md:text-base cursor-pointer">
-                              {task.label}
-                              <span className="ml-1.5 text-xs font-normal text-zinc-400">(tarea para vos)</span>
+                              <span className="uppercase">{task.label}</span>
+                              <span className="ml-1.5 text-xs font-normal text-zinc-400 normal-case">(tarea para vos)</span>
                             </Label>
                             {task.link_url ? (
                               <a
@@ -315,17 +361,27 @@ export function PhaseTasks({ phase }: { phase: string }) {
                     </div>
                   )}
 
+                  {advanceError && (
+                    <p className="text-sm text-red-400">{advanceError}</p>
+                  )}
                   <div className="pt-4 max-w-sm">
                     <Button
                       onClick={handleFinishPhase}
-                      disabled={!hasAnyTasks || !allTasksCompleted || finishing}
+                      disabled={
+                        !nextPhase ||
+                        !hasAnyTasks ||
+                        !allTasksCompleted ||
+                        finishing
+                      }
                       className="w-full h-11 bg-zinc-900 border border-zinc-600 text-white rounded-full hover:bg-zinc-800 hover:border-zinc-400 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {finishing
-                        ? "Avanzando..."
-                        : nextPhase
-                          ? `Terminar fase "${phase}"`
-                          : `Completar programa`}
+                        ? "Enviando solicitud..."
+                        : nextPhase === "done"
+                          ? `Solicitar cierre del programa`
+                          : nextPhase
+                            ? `Solicitar paso a «${nextPhase}»`
+                            : "Solicitar avance"}
                     </Button>
                   </div>
                 </div>

@@ -28,10 +28,13 @@ def create_mandatory_task(
     try:
         result = service.create(payload)
         return {"message": "Tarea creada correctamente", "success": True, "data": result}
-    except HTTPException as e:
-        return {"message": e.detail, "success": False}
-    except Exception:
-        return {"message": "Error inesperado al crear tarea.", "success": False}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Error inesperado al crear tarea.",
+        ) from e
 
 
 @router.patch("/mandatory-tasks/{task_id}")
@@ -43,10 +46,13 @@ def update_mandatory_task(
     try:
         result = service.update(task_id, payload)
         return {"message": "Tarea actualizada correctamente", "success": True, "data": result}
-    except HTTPException as e:
-        return {"message": e.detail, "success": False}
-    except Exception:
-        return {"message": "Error inesperado al actualizar tarea.", "success": False}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Error inesperado al actualizar tarea.",
+        ) from e
 
 
 @router.delete("/mandatory-tasks/{task_id}")
@@ -57,10 +63,13 @@ def delete_mandatory_task(
     try:
         service.delete(task_id)
         return {"message": "Tarea eliminada correctamente", "success": True}
-    except HTTPException as e:
-        return {"message": e.detail, "success": False}
-    except Exception:
-        return {"message": "Error inesperado al eliminar tarea.", "success": False}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Error inesperado al eliminar tarea.",
+        ) from e
 
 
 @router.get("/mandatory-tasks-completion")

@@ -13,6 +13,14 @@ user_service = UsersService()
 client_service = ClientService()
 activation_service = ActivationTaskService()
 
+# Transiciones que el cliente puede aplicar solo (sin aprobación del director)
+_CLIENT_SELF_PHASE_MOVES = {("platforms", "Acceso")}
+
+
+def _client_may_set_phase_directly(old_phase: str | None, new_phase: str) -> bool:
+    old = old_phase or ""
+    return (old, new_phase) in _CLIENT_SELF_PHASE_MOVES
+
 
 @router.delete("/by-email")
 def delete_user_by_email(
@@ -77,31 +85,78 @@ def update_email(
         return {"message": "Error inesperado al actualizar email.", "success": False}
 
 
+@router.get("/me/client-phase")
+def get_my_client_phase(current_user=Depends(get_current_user)):
+    if current_user.role != Role.CLIENTE:
+        raise HTTPException(status_code=403, detail="Solo para clientes")
+    try:
+        phase = client_service.get_or_create_client_phase(current_user.id)
+        return {"phase": phase}
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener la fase")
+
+
+@router.post("/phase-advance-request")
+def request_phase_advance(
+    payload: schemas.PhaseAdvanceRequest,
+    request: Request,
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != Role.CLIENTE:
+        return {"message": "Solo los alumnos pueden solicitar avance de fase", "success": False}
+    if payload.email.strip().lower() != current_user.email.strip().lower():
+        return {"message": "No autorizado", "success": False}
+    try:
+        ok, msg = activation_service.create_phase_advance_request(
+            payload.email, payload.next_phase
+        )
+        if not ok:
+            return {"message": msg, "success": False}
+        loop = request.app.state.loop
+        loop.call_soon_threadsafe(lambda: broadcast(EVENT_ACTIVATION_TASKS_CHANGED))
+        return {"message": msg, "success": True}
+    except HTTPException as e:
+        return {"message": e.detail, "success": False}
+    except Exception:
+        return {"message": "Error inesperado al solicitar avance.", "success": False}
+
+
 @router.put("/client-phase")
 def set_client_phase(
     payload: schemas.ClientPhaseRequest,
-    request: Request,
     current_user=Depends(get_current_user),
 ):
     VALID_PHASES = {
         "initial", "platforms", "tasks", "onboarding", "done",
-        "Acceso", "Onboarding", "Bases de Negocio",
-        "Creación de Funnels", "Marketing y Comunicación",
-        "Ecosistema de Contenido", "Procesos de Venta",
-        "Producto y Funnel Interno",
+        "Acceso", "Onboarding", "Base de Negocios",
+        "Marketing", "Proceso de Ventas", "Optimizar",
+        # aliases legacy para no romper datos existentes
+        "Bases de Negocio", "Creación de Funnels", "Marketing y Comunicación",
+        "Ecosistema de Contenido", "Procesos de Venta", "Producto y Funnel Interno",
     }
     if payload.phase not in VALID_PHASES:
         return {"message": "Fase no válida", "success": False}
     try:
         old_phase = client_service.get_client_phase_by_email(payload.email)
+        if current_user.role == Role.CLIENTE:
+            if payload.email.strip().lower() != current_user.email.strip().lower():
+                return {"message": "No autorizado", "success": False}
+            if old_phase != payload.phase and not _client_may_set_phase_directly(
+                old_phase, payload.phase
+            ):
+                return {
+                    "message": (
+                        "Para pasar de fase completá las tareas y enviá la solicitud; "
+                        "tu director debe aprobar el avance."
+                    ),
+                    "success": False,
+                }
+
         ok = client_service.set_client_phase_by_email(payload.email, payload.phase)
         if not ok:
             return {"message": "Usuario no encontrado", "success": False}
-
-        if current_user.role == Role.CLIENTE and old_phase and old_phase != payload.phase:
-            activation_service.create_phase_completed_task(payload.email, old_phase)
-            loop = request.app.state.loop
-            loop.call_soon_threadsafe(lambda: broadcast(EVENT_ACTIVATION_TASKS_CHANGED))
 
         return {"message": "Fase actualizada correctamente", "success": True}
     except HTTPException as e:

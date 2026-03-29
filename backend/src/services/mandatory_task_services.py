@@ -1,9 +1,31 @@
+import json
 import logging
 from fastapi import HTTPException
 from pony.orm import db_session
 from src import models, schemas
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_deliverable_links(raw: str | None) -> list[str]:
+    if not raw or not str(raw).strip():
+        return []
+    try:
+        data = json.loads(raw)
+        if isinstance(data, list):
+            return [str(x).strip() for x in data if str(x).strip()]
+        return []
+    except (json.JSONDecodeError, TypeError):
+        return []
+
+
+def _dump_deliverable_links(urls: list[str] | None) -> str | None:
+    if not urls:
+        return None
+    cleaned = [u.strip() for u in urls if u and str(u).strip()]
+    if not cleaned:
+        return None
+    return json.dumps(cleaned, ensure_ascii=False)
 
 
 def _slug_from_label(label: str) -> str:
@@ -36,6 +58,9 @@ class MandatoryTaskService:
                         "slug": t.slug,
                         "label": t.label,
                         "link_url": t.link_url or "",
+                        "deliverable_links": _parse_deliverable_links(
+                            getattr(t, "deliverable_links", None)
+                        ),
                         "order": t.order,
                         "phase": t.phase,
                     }
@@ -56,29 +81,44 @@ class MandatoryTaskService:
                     n += 1
                     slug = f"{base}_{n}"
                 max_order = 0
-                for t in models.MandatoryTask.select(lambda t: t.phase == data.phase):
-                    if t.order is not None and t.order > max_order:
+                for t in list(models.MandatoryTask.select()):
+                    if t.phase == data.phase and t.order is not None and t.order > max_order:
                         max_order = t.order
-                task = models.MandatoryTask(
-                    slug=slug,
-                    label=data.label,
-                    link_url=data.link_url or None,
-                    phase=data.phase,
-                    order=max_order + 1,
-                )
+                create_kw: dict = {
+                    "slug": slug,
+                    "label": data.label,
+                    "link_url": (data.link_url or "").strip(),
+                    "phase": data.phase,
+                    "order": max_order + 1,
+                }
+                dumped_dl = _dump_deliverable_links(data.deliverable_links)
+                if dumped_dl is not None:
+                    create_kw["deliverable_links"] = dumped_dl
+                task = models.MandatoryTask(**create_kw)
                 task.flush()
                 return {
                     "id": task.id,
                     "slug": task.slug,
                     "label": task.label,
                     "link_url": task.link_url or "",
+                    "deliverable_links": _parse_deliverable_links(task.deliverable_links),
                     "order": task.order,
                     "phase": task.phase,
                 }
             except HTTPException:
                 raise
-            except Exception:
-                raise HTTPException(status_code=500, detail="Error al crear tarea obligatoria")
+            except Exception as e:
+                logger.exception("MandatoryTaskService.create")
+                err_s = str(e).lower()
+                detail = "Error al crear tarea obligatoria"
+                if "deliverable_links" in err_s or (
+                    "column" in err_s and "does not exist" in err_s
+                ) or "no such column" in err_s:
+                    detail = (
+                        "La base no tiene la columna de entregables. "
+                        "Ejecutá: cd backend && python3 ../scripts/add_mandatory_task_deliverable_links.py"
+                    )
+                raise HTTPException(status_code=500, detail=detail) from e
 
     def update(self, task_id: int, data: schemas.MandatoryTaskUpdate) -> dict:
         with db_session:
@@ -89,12 +129,16 @@ class MandatoryTaskService:
                 if data.label is not None:
                     task.label = data.label
                 if data.link_url is not None:
-                    task.link_url = data.link_url or None
+                    task.link_url = (data.link_url or "").strip()
+                if data.deliverable_links is not None:
+                    dumped = _dump_deliverable_links(data.deliverable_links)
+                    task.deliverable_links = dumped if dumped is not None else ""
                 return {
                     "id": task.id,
                     "slug": task.slug,
                     "label": task.label,
                     "link_url": task.link_url or "",
+                    "deliverable_links": _parse_deliverable_links(task.deliverable_links),
                     "order": task.order,
                     "phase": task.phase,
                 }

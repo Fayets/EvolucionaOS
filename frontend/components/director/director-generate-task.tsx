@@ -80,7 +80,7 @@ export function DirectorGenerateTask() {
 
   const handleCreateParticular = async (e: React.FormEvent) => {
     e.preventDefault()
-    const label = particularLabel.trim()
+    const label = particularLabel.trim().toUpperCase()
     if (!label || !selectedEmail) return
     setParticularSubmitting(true)
     setParticularSuccess(false)
@@ -176,9 +176,10 @@ export function DirectorGenerateTask() {
                     <Label className="text-zinc-200">Título de la tarea</Label>
                     <Input
                       value={particularLabel}
-                      onChange={(e) => setParticularLabel(e.target.value)}
-                      placeholder="Ej: Revisar documento de avance"
-                      className="h-10 bg-zinc-900 border-zinc-600 text-white"
+                      onChange={(e) => setParticularLabel(e.target.value.toUpperCase())}
+                      placeholder="EJ: REVISAR DOCUMENTO DE AVANCE"
+                      autoCapitalize="characters"
+                      className="h-10 bg-zinc-900 border-zinc-600 text-white uppercase"
                       required
                     />
                   </div>
@@ -213,7 +214,7 @@ export function DirectorGenerateTask() {
                     <p className="text-xs text-zinc-400 mb-2">Tareas particulares ya creadas en esta fase:</p>
                     <ul className="space-y-1 text-sm text-zinc-300">
                       {particularTasks.map((t) => (
-                        <li key={t.id}>
+                        <li key={t.id} className="uppercase">
                           {t.label}
                           {t.link_url && (
                             <a

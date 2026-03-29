@@ -63,7 +63,6 @@ const DIRECTOR_PHASE_BASE: string[] = [
   "Acceso",
   "Onboarding",
   ...CLIENT_PHASES.slice(2),
-  "done",
 ]
 
 function phaseSelectValues(currentPhase: string | undefined): string[] {
@@ -95,6 +94,12 @@ const phaseLabel: Record<string, string> = {
   done: "Programa completado",
   tasks: "Acceso",
   onboarding: "Onboarding",
+  "Bases de Negocio": "Base de Negocios",
+  "Marketing y Comunicación": "Marketing",
+  "Procesos de Venta": "Proceso de Ventas",
+  "Creación de Funnels": "Optimizar",
+  "Ecosistema de Contenido": "Optimizar",
+  "Producto y Funnel Interno": "Optimizar",
 }
 
 function phaseName(phase: string): string {
@@ -267,7 +272,7 @@ function TaskProgress({ email, phase }: { email: string; phase: string }) {
                 ) : (
                   <Circle size={14} className="text-zinc-700 shrink-0" />
                 )}
-                <span className={`text-[13px] ${done ? "text-zinc-400 line-through" : "text-zinc-300"}`}>
+                <span className={`text-[13px] uppercase ${done ? "text-zinc-400 line-through" : "text-zinc-300"}`}>
                   {t.label}
                 </span>
               </div>
@@ -287,7 +292,7 @@ function TaskProgress({ email, phase }: { email: string; phase: string }) {
               ) : (
                 <Circle size={14} className="text-zinc-700 shrink-0" />
               )}
-              <span className={`text-[13px] ${t.completed ? "text-zinc-400 line-through" : "text-zinc-300"}`}>
+              <span className={`text-[13px] uppercase ${t.completed ? "text-zinc-400 line-through" : "text-zinc-300"}`}>
                 {t.label}
               </span>
             </div>

@@ -18,10 +18,18 @@ class NotificationService:
                 user = models.User.get(email=task.client_email)
                 if not user:
                     return None
+                if task.requested_next_phase:
+                    title = "Fase aprobada"
+                    body = (
+                        f'Tu director aprobó el avance a la fase "{task.requested_next_phase}".'
+                    )
+                else:
+                    title = "Tarea completada"
+                    body = f"El administrador completó tu solicitud: {task.description}"
                 models.Notification(
                     user=user,
-                    title="Tarea completada",
-                    body=f"El administrador completó tu solicitud: {task.description}",
+                    title=title,
+                    body=body,
                 )
                 return task.client_email
             except HTTPException:

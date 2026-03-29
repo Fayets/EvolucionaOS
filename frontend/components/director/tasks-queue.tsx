@@ -12,6 +12,7 @@ interface DirectorTask {
   clientName: string
   clientEmail: string
   description: string
+  requestedNextPhase: string | null
   completed: boolean
   isNew: boolean
 }
@@ -21,6 +22,7 @@ function mapTask(raw: {
   clientName: string
   clientEmail: string
   description: string
+  requestedNextPhase?: string | null
   completed: boolean
   isNew: boolean
 }): DirectorTask {
@@ -29,6 +31,8 @@ function mapTask(raw: {
     clientName: raw.clientName,
     clientEmail: raw.clientEmail,
     description: raw.description,
+    requestedNextPhase:
+      typeof raw.requestedNextPhase === "string" ? raw.requestedNextPhase : null,
     completed: raw.completed,
     isNew: raw.isNew,
   }
@@ -185,6 +189,11 @@ export function TasksQueue() {
                   )}
                 </div>
                 <p className="text-sm text-zinc-200 mb-1">{task.description}</p>
+                {task.requestedNextPhase && (
+                  <p className="text-xs font-medium text-amber-200/90 mb-1">
+                    Al marcar como hecha, el alumno pasa a: «{task.requestedNextPhase}»
+                  </p>
+                )}
                 <p className="text-xs text-zinc-500">{task.clientEmail}</p>
               </div>
             </div>

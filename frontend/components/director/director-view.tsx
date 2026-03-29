@@ -10,6 +10,7 @@ import { TasksQueue } from "./tasks-queue"
 import { RegisterUserForm } from "./register-user-form"
 import { RegisteredUsersList } from "./registered-users-list"
 import { DirectorSettings } from "./director-settings"
+import { DirectorPhases } from "./director-phases"
 import { DirectorGenerateTask } from "./director-generate-task"
 
 export function DirectorView() {
@@ -30,6 +31,7 @@ export function DirectorView() {
             {view === "register" && <RegisterUserForm />}
             {view === "users" && <RegisteredUsersList />}
             {view === "generateTask" && <DirectorGenerateTask />}
+            {view === "phases" && <DirectorPhases />}
             {view === "settings" && <DirectorSettings />}
           </div>
         </div>

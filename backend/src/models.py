@@ -33,7 +33,7 @@ class User(db.Entity):
 class Client(db.Entity):
     id = PrimaryKey(int, auto=True)
     user = Required(User, unique=True)
-    # 'initial' | 'platforms' | 'tasks' | 'onboarding' | 'done'
+    # 'initial' | 'platforms' | 'tasks' | 'onboarding' | 'done' | fases de programa
     phase = Required(str)
     phone = Optional(str)
     email = Optional(str)
@@ -70,6 +70,7 @@ class MandatoryTask(db.Entity):
     slug = Required(str, unique=True)
     label = Required(str)
     link_url = Optional(str)
+    deliverable_links = Optional(str)  # JSON array de URLs
     order = Optional(int)
     phase = Required(str, default="Acceso")
 
@@ -103,6 +104,8 @@ class ActivationTask(db.Entity):
     client_name = Required(str)
     client_email = Required(str)
     description = Required(str)
+    # Si está definido, al marcar la tarea como completada se asigna esta fase al cliente
+    requested_next_phase = Optional(str)
     completed = Required(bool, default=False)
     is_new = Required(bool, default=True)
     created_at = Required(datetime, default=datetime.utcnow)

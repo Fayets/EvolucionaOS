@@ -16,6 +16,7 @@ interface TaskFromApi {
   slug: string
   label: string
   link_url: string
+  deliverable_links?: string[]
   order: number | null
   phase: string
 }
@@ -263,7 +264,10 @@ export function AccessTasks() {
                     <p className="text-zinc-400 text-sm">No hay tareas configuradas para esta fase.</p>
                   ) : (
                     <div className="space-y-4">
-                      {tasks.map(task => (
+                      {tasks.map(task => {
+                        const hasClass = Boolean(task.link_url?.trim())
+                        const deliverables = (task.deliverable_links ?? []).filter(Boolean)
+                        return (
                         <div
                           key={`m-${task.id}`}
                           className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 bg-zinc-900/70 px-4 py-3"
@@ -273,23 +277,37 @@ export function AccessTasks() {
                               htmlFor={`task-${task.slug}`}
                               className="text-sm md:text-base cursor-pointer"
                             >
-                              {task.label}{" "}
+                              <span className="uppercase">{task.label}</span>{" "}
                               <span className="font-semibold text-amber-300">
                                 OBLIGATORIO
                               </span>
                             </Label>
-                            {task.link_url ? (
-                              <a
-                                href={task.link_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-purple-300 underline mt-1 text-left hover:text-purple-200"
-                              >
-                                Ver enlace
-                              </a>
-                            ) : (
-                              <span className="text-xs text-zinc-500 mt-1">Sin enlace configurado</span>
-                            )}
+                            <div className="flex flex-col items-start gap-0.5 mt-1">
+                              {hasClass && task.link_url ? (
+                                <a
+                                  href={task.link_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-purple-300 underline text-left hover:text-purple-200"
+                                >
+                                  Ver clase
+                                </a>
+                              ) : null}
+                              {deliverables.map((url, i) => (
+                                <a
+                                  key={`${task.slug}-d-${i}`}
+                                  href={url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-fuchsia-300/90 underline text-left hover:text-fuchsia-200"
+                                >
+                                  Entregable {i + 1}
+                                </a>
+                              ))}
+                              {!hasClass && deliverables.length === 0 ? (
+                                <span className="text-xs text-zinc-500">Sin enlaces configurados</span>
+                              ) : null}
+                            </div>
                           </div>
                           <Checkbox
                             id={`task-${task.slug}`}
@@ -298,7 +316,8 @@ export function AccessTasks() {
                             className="w-5 h-5 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
                           />
                         </div>
-                      ))}
+                        )
+                      })}
                       {particularTasks.map(task => (
                         <div
                           key={`p-${task.id}`}
@@ -309,8 +328,8 @@ export function AccessTasks() {
                               htmlFor={`particular-${task.id}`}
                               className="text-sm md:text-base cursor-pointer"
                             >
-                              {task.label}
-                              <span className="ml-1.5 text-xs font-normal text-zinc-400">(tarea para vos)</span>
+                              <span className="uppercase">{task.label}</span>
+                              <span className="ml-1.5 text-xs font-normal text-zinc-400 normal-case">(tarea para vos)</span>
                             </Label>
                             {task.link_url ? (
                               <a
