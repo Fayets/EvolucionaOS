@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from fastapi import HTTPException
 from pony.orm import db_session
 from src import models
@@ -107,6 +108,10 @@ class ActivationTaskService:
                     return False, "Transición de fase no válida"
                 pending = _activation_tasks_pending_phase_advance(email)
                 if pending:
+                    # Si ya hay solicitud pendiente, la volvemos a marcar como nueva
+                    # para que el director reciba nuevamente la alerta visual.
+                    for task in pending:
+                        task.is_new = True
                     return True, "Ya tenés una solicitud pendiente de aprobación"
                 if user.first_name or user.last_name:
                     client_name = " ".join(
@@ -133,6 +138,40 @@ class ActivationTaskService:
             except Exception as e:
                 logger.exception("create_phase_advance_request: %s", e)
                 return False, "Error al registrar la solicitud"
+
+    def get_pending_phase_advance_target(self, email: str) -> str | None:
+        """Devuelve la fase objetivo pendiente para el cliente, o None."""
+        with db_session:
+            try:
+                pending = _activation_tasks_pending_phase_advance(email)
+                if not pending:
+                    return None
+                task = pending[0]
+                target = (task.requested_next_phase or "").strip()
+                return target or None
+            except Exception as e:
+                logger.exception("get_pending_phase_advance_target: %s", e)
+                return None
+
+    def clear_pending_phase_advance_requests(self, email: str) -> int:
+        """
+        Cierra solicitudes pendientes de avance de fase para permitir cambios manuales del staff
+        sin dejar al cliente atascado en "esperando aprobación".
+        """
+        with db_session:
+            try:
+                pending = _activation_tasks_pending_phase_advance(email)
+                if not pending:
+                    return 0
+                now = datetime.utcnow()
+                for task in pending:
+                    task.completed = True
+                    task.is_new = False
+                    task.completed_at = now
+                return len(pending)
+            except Exception as e:
+                logger.exception("clear_pending_phase_advance_requests: %s", e)
+                return 0
 
     def create_deliverable_submitted_task(
         self, email: str, task_label: str, task_slug: str

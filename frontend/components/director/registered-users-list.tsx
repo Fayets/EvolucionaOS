@@ -113,8 +113,8 @@ const phaseLabel: Record<string, string> = {
   "Bases de Negocio": "Base de Negocios",
   "Marketing y Comunicación": "Marketing",
   "Procesos de Venta": "Proceso de Ventas",
-  "Creación de Funnels": "Optimizar",
-  "Ecosistema de Contenido": "Optimizar",
+  "Creación de Funnels": "Marketing",
+  "Ecosistema de Contenido": "Proceso de Ventas",
   "Producto y Funnel Interno": "Optimizar",
 }
 
@@ -396,13 +396,21 @@ export function RegisteredUsersList() {
         method: "PUT",
         body: JSON.stringify({ email: viewEmail, phase: newPhase }),
       })
-      if (res.ok) {
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean
+        message?: string
+      }
+      if (res.ok && data.success !== false) {
         setDetail(prev => prev ? {
           ...prev,
           client: prev.client ? { ...prev.client, phase: newPhase } : prev.client,
         } : prev)
+      } else {
+        alert(data.message || "No se pudo actualizar la fase del cliente.")
       }
-    } catch {}
+    } catch {
+      alert("Error de conexión al actualizar la fase.")
+    }
     setPhaseUpdating(false)
   }
 

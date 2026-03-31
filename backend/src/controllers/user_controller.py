@@ -134,6 +134,30 @@ def request_phase_advance(
         return {"message": "Error inesperado al solicitar avance.", "success": False}
 
 
+@router.get("/phase-advance-status")
+def get_phase_advance_status(
+    email: str = Query(..., description="Email del cliente"),
+    current_user=Depends(get_current_user),
+):
+    if current_user.role != Role.CLIENTE:
+        return {"success": False, "message": "Solo para clientes", "pending": False}
+    if email.strip().lower() != current_user.email.strip().lower():
+        return {"success": False, "message": "No autorizado", "pending": False}
+    try:
+        target = activation_service.get_pending_phase_advance_target(email)
+        return {
+            "success": True,
+            "pending": bool(target),
+            "target_phase": target,
+        }
+    except Exception:
+        return {
+            "success": False,
+            "message": "Error al obtener el estado de solicitud",
+            "pending": False,
+        }
+
+
 @router.put("/client-phase")
 def set_client_phase(
     payload: schemas.ClientPhaseRequest,
@@ -168,6 +192,11 @@ def set_client_phase(
         ok = client_service.set_client_phase_by_email(payload.email, payload.phase)
         if not ok:
             return {"message": "Usuario no encontrado", "success": False}
+
+        # Si el cambio lo hace staff manualmente, cerramos solicitudes pendientes
+        # para evitar que el cliente quede atascado en pantalla de espera.
+        if current_user.role != Role.CLIENTE and old_phase != payload.phase:
+            activation_service.clear_pending_phase_advance_requests(payload.email)
 
         return {"message": "Fase actualizada correctamente", "success": True}
     except HTTPException as e:

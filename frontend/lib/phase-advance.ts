@@ -29,3 +29,24 @@ export async function fetchMyClientPhase(): Promise<string | null> {
     return null
   }
 }
+
+export async function fetchPendingPhaseAdvance(
+  email: string
+): Promise<{ pending: boolean; targetPhase: string | null }> {
+  try {
+    const res = await apiFetch(
+      `/users/phase-advance-status?email=${encodeURIComponent(email)}`
+    )
+    if (!res.ok) return { pending: false, targetPhase: null }
+    const data = (await res.json()) as {
+      pending?: boolean
+      target_phase?: string | null
+    }
+    return {
+      pending: data.pending === true,
+      targetPhase: typeof data.target_phase === "string" ? data.target_phase : null,
+    }
+  } catch {
+    return { pending: false, targetPhase: null }
+  }
+}

@@ -11,6 +11,7 @@ import {
 } from "react"
 import {
   EVOLUCIONA_AUTH_UNAUTHORIZED,
+  apiFetch,
   setToken as persistToken,
 } from "@/lib/api"
 
@@ -98,6 +99,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       saveSession(null)
     }
   }, [hydrated, isLoggedIn, userRole, clientPhase, userEmail, accessToken])
+
+  // Al refrescar, sincroniza fase real desde backend para clientes.
+  useEffect(() => {
+    if (!hydrated || !isLoggedIn || userRole !== "client" || !accessToken) return
+    const syncClientPhase = async () => {
+      try {
+        const res = await apiFetch("/users/me/client-phase", { bearerToken: accessToken })
+        if (!res.ok) return
+        const data = (await res.json()) as { phase?: string }
+        if (typeof data.phase === "string" && data.phase && data.phase !== clientPhase) {
+          setClientPhase(data.phase)
+        }
+      } catch {
+        // ignore network errors; UI conserva el estado local
+      }
+    }
+    void syncClientPhase()
+  }, [hydrated, isLoggedIn, userRole, accessToken, clientPhase])
 
   const logout = useCallback(() => {
     setIsLoggedIn(false)

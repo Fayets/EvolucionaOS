@@ -48,9 +48,11 @@ export function AppNotifications() {
     fetchCount()
     const onChanged = () => fetchCount()
     const onFocus = () => fetchCount()
+    const interval = setInterval(() => fetchCount(), 8000)
     window.addEventListener(ACTIVATION_TASKS_CHANGED, onChanged)
     window.addEventListener("focus", onFocus)
     return () => {
+      clearInterval(interval)
       window.removeEventListener(ACTIVATION_TASKS_CHANGED, onChanged)
       window.removeEventListener("focus", onFocus)
     }
@@ -123,7 +125,7 @@ export function AppNotifications() {
                   {newCount} nueva{newCount > 1 ? "s" : ""} tarea de activación
                 </span>
                 <span className="text-xs text-zinc-400">
-                  Revisá la cola de tareas para ver clientes que hicieron clic en Skool.
+                  Revisá la cola de tareas para ver nuevas solicitudes de activación y avance de fase.
                 </span>
               </DropdownMenuItem>
             ) : (

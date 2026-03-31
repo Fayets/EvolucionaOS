@@ -31,7 +31,7 @@ EvolucionaOS/
 1. **Backend** (desde `backend/`):
 
    ```bash
-   uvicorn main:app --reload
+   python3 -m uvicorn main:app --reload
    ```
 
    Puerto habitual **8000**. Rutas REST: `http://127.0.0.1:8000/api/...`. SSE: `http://127.0.0.1:8000/events/...`.
@@ -109,7 +109,7 @@ La nota refleja un **producto entregable y desplegable** con deuda típica de eq
 | `frontend/` | `npm run dev` | Desarrollo |
 | `frontend/` | `npm run build` | Build producción |
 | `frontend/` | `npm run lint` | ESLint |
-| `backend/` | `uvicorn main:app --reload` | API en desarrollo |
+| `backend/` | `python3 -m uvicorn main:app --reload` | API en desarrollo |
 
 ---
 

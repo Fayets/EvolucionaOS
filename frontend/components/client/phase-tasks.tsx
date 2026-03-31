@@ -4,7 +4,11 @@ import { useState, useEffect, useCallback } from "react"
 import { useApp } from "@/lib/app-context"
 import { apiFetch } from "@/lib/api"
 import { getNextPhaseOrDone } from "@/lib/phases"
-import { fetchMyClientPhase, requestPhaseAdvance } from "@/lib/phase-advance"
+import {
+  fetchMyClientPhase,
+  fetchPendingPhaseAdvance,
+  requestPhaseAdvance,
+} from "@/lib/phase-advance"
 import { CLIENT_NOTIFICATIONS_CHANGED } from "@/lib/use-client-notifications-sse"
 import { ClientLayoutLogo, ClientSidebar } from "@/components/client-sidebar"
 import { Button } from "@/components/ui/button"
@@ -140,6 +144,16 @@ export function PhaseTasks({ phase }: { phase: string }) {
   useEffect(() => {
     const load = async () => {
       setLoading(true)
+      if (userEmail) {
+        const pending = await fetchPendingPhaseAdvance(userEmail)
+        if (pending.pending && pending.targetPhase) {
+          setAwaitingDirector(true)
+          setPendingTargetPhase(pending.targetPhase)
+        } else {
+          setAwaitingDirector(false)
+          setPendingTargetPhase(null)
+        }
+      }
       await fetchTasks()
       await fetchCompletion()
       await fetchParticularTasks()
@@ -147,7 +161,7 @@ export function PhaseTasks({ phase }: { phase: string }) {
       setLoading(false)
     }
     load()
-  }, [fetchTasks, fetchCompletion, fetchParticularTasks, fetchDeliverables])
+  }, [userEmail, fetchTasks, fetchCompletion, fetchParticularTasks, fetchDeliverables])
 
   useEffect(() => {
     const refreshTasks = () => {

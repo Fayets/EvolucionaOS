@@ -15,6 +15,7 @@ interface DirectorTask {
   requestedNextPhase: string | null
   completed: boolean
   isNew: boolean
+  createdAt: string | null
 }
 
 function mapTask(raw: {
@@ -25,6 +26,7 @@ function mapTask(raw: {
   requestedNextPhase?: string | null
   completed: boolean
   isNew: boolean
+  created_at?: string | null
 }): DirectorTask {
   return {
     id: String(raw.id),
@@ -35,7 +37,15 @@ function mapTask(raw: {
       typeof raw.requestedNextPhase === "string" ? raw.requestedNextPhase : null,
     completed: raw.completed,
     isNew: raw.isNew,
+    createdAt: typeof raw.created_at === "string" ? raw.created_at : null,
   }
+}
+
+function sortTasksNewestFirst(a: DirectorTask, b: DirectorTask): number {
+  const ta = a.createdAt ? Date.parse(a.createdAt) : Number.NaN
+  const tb = b.createdAt ? Date.parse(b.createdAt) : Number.NaN
+  if (!Number.isNaN(ta) && !Number.isNaN(tb)) return tb - ta
+  return Number(b.id) - Number(a.id)
 }
 
 export function TasksQueue() {
@@ -48,7 +58,7 @@ export function TasksQueue() {
       if (!res.ok) return
       const data = await res.json()
       const list = Array.isArray(data.tasks) ? data.tasks : []
-      setTasks(list.map(mapTask))
+      setTasks(list.map(mapTask).sort(sortTasksNewestFirst))
     } catch {
       setTasks([])
     } finally {
@@ -60,9 +70,11 @@ export function TasksQueue() {
     fetchTasks()
     const onChanged = () => fetchTasks()
     const onFocus = () => fetchTasks()
+    const interval = setInterval(() => fetchTasks(), 8000)
     window.addEventListener(ACTIVATION_TASKS_CHANGED, onChanged)
     window.addEventListener("focus", onFocus)
     return () => {
+      clearInterval(interval)
       window.removeEventListener(ACTIVATION_TASKS_CHANGED, onChanged)
       window.removeEventListener("focus", onFocus)
     }
