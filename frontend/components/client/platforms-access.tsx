@@ -57,7 +57,7 @@ export function PlatformsAccess() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-transparent px-4 py-10 text-white">
       <Image
-        src="/evolucionalogologin.png"
+        src="/EvolucionaLogoLogin.png"
         alt="Evoluciona"
         width={140}
         height={140}

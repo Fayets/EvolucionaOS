@@ -48,7 +48,7 @@ export function InitialDataForm() {
     <div className="min-h-screen flex flex-col items-center justify-center bg-transparent px-4 py-10 text-white">
       <div className="flex flex-col items-center gap-6 w-full max-w-xl">
         <Image
-          src="/evolucionalogologin.png"
+          src="/EvolucionaLogoLogin.png"
           alt="Evoluciona"
           width={160}
           height={160}
