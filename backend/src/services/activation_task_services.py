@@ -25,13 +25,16 @@ def _activation_tasks_select_all_sql() -> list:
 def _activation_tasks_pending_phase_advance(email: str) -> list:
     """Solicitudes de avance de fase pendientes para un email (Neon/Postgres)."""
     g = {"phase_adv_email": email}
+    # Pony puede persistir Optional(str) como '' en vez de NULL; `IS NOT NULL` no alcanza.
     sql_lo = (
         "SELECT * FROM activationtask WHERE client_email = $phase_adv_email "
-        "AND requested_next_phase IS NOT NULL AND completed = false LIMIT 4"
+        "AND requested_next_phase IS NOT NULL AND length(trim(requested_next_phase)) > 0 "
+        "AND completed = false LIMIT 4"
     )
     sql_q = (
         'SELECT * FROM "ActivationTask" WHERE client_email = $phase_adv_email '
-        "AND requested_next_phase IS NOT NULL AND completed = false LIMIT 4"
+        "AND requested_next_phase IS NOT NULL AND length(trim(requested_next_phase)) > 0 "
+        "AND completed = false LIMIT 4"
     )
     try:
         return models.ActivationTask.select_by_sql(sql_lo, globals=g)
