@@ -154,3 +154,10 @@ class DiscordLinkResponse(BaseModel):
 class DiscordLinkUpdate(BaseModel):
     url: str
 
+
+class DeployInfoResponse(BaseModel):
+    """SHA del commit del backend en producción (inyectado por CI/hosting)."""
+
+    commit_sha: str
+    commit_url: str | None = None
+
