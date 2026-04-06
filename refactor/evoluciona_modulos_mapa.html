@@ -1,0 +1,153 @@
+
+<div style="padding: 0.5rem 0 1.5rem;">
+
+<div style="display:flex; gap:8px; margin-bottom:1.5rem;">
+  <button onclick="switchView('cliente')" id="btn-cliente" style="padding:6px 18px; border-radius:20px; border:1.5px solid #1D9E75; background:#E1F5EE; color:#0F6E56; font-size:13px; font-weight:500; cursor:pointer;">Cliente</button>
+  <button onclick="switchView('director')" id="btn-director" style="padding:6px 18px; border-radius:20px; border:0.5px solid var(--color-border-secondary); background:var(--color-background-secondary); color:var(--color-text-secondary); font-size:13px; font-weight:500; cursor:pointer;">Director</button>
+</div>
+
+<div id="view-cliente">
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:1rem;">
+    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#1D9E75; flex-shrink:0;"></span>
+    <span style="font-size:14px; font-weight:500; color:var(--color-text-primary);">Área del cliente</span>
+    <code style="font-size:11px; color:#0F6E56; background:#E1F5EE; padding:2px 8px; border-radius:4px;">/cliente</code>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px;">
+
+    <div style="background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-left:3px solid #1D9E75; border-radius:var(--border-radius-lg); padding:1rem 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:500; color:var(--color-text-primary);">Inicio</span>
+        <code style="font-size:11px; color:#0F6E56; background:#E1F5EE; padding:2px 6px; border-radius:4px;">/inicio</code>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <span style="font-size:13px; color:var(--color-text-secondary);">Feed de notificaciones y alertas</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Resumen de progreso del programa</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Acceso rápido a tareas pendientes</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Próximos hitos desbloqueados</span>
+      </div>
+    </div>
+
+    <div style="background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-left:3px solid #1D9E75; border-radius:var(--border-radius-lg); padding:1rem 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:500; color:var(--color-text-primary);">Programa</span>
+        <code style="font-size:11px; color:#0F6E56; background:#E1F5EE; padding:2px 6px; border-radius:4px;">/programa</code>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <span style="font-size:13px; color:var(--color-text-secondary);">Todas las fases del programa</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Estado por fase: bloqueado / activo / completado</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Entregables y formularios por fase</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Historial de avance</span>
+      </div>
+    </div>
+
+    <div style="background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-left:3px solid #1D9E75; border-radius:var(--border-radius-lg); padding:1rem 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:500; color:var(--color-text-primary);">Tareas</span>
+        <code style="font-size:11px; color:#0F6E56; background:#E1F5EE; padding:2px 6px; border-radius:4px;">/tareas</code>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <span style="font-size:13px; color:var(--color-text-secondary);">Tareas obligatorias pendientes</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Tareas de activación asignadas</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Formularios y entregas por tarea</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Estado de completitud</span>
+      </div>
+    </div>
+
+    <div style="background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-left:3px solid #1D9E75; border-radius:var(--border-radius-lg); padding:1rem 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:500; color:var(--color-text-primary);">Perfil</span>
+        <code style="font-size:11px; color:#0F6E56; background:#E1F5EE; padding:2px 6px; border-radius:4px;">/perfil</code>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <span style="font-size:13px; color:var(--color-text-secondary);">Datos de cuenta y preferencias</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Plataformas conectadas (onboarding)</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Historial de sesión</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Opciones de notificación</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="view-director" style="display:none;">
+  <div style="display:flex; align-items:center; gap:10px; margin-bottom:1rem;">
+    <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:#D85A30; flex-shrink:0;"></span>
+    <span style="font-size:14px; font-weight:500; color:var(--color-text-primary);">Área del director</span>
+    <code style="font-size:11px; color:#993C1D; background:#FAECE7; padding:2px 8px; border-radius:4px;">/director</code>
+  </div>
+
+  <div style="display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px;">
+
+    <div style="background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-left:3px solid #D85A30; border-radius:var(--border-radius-lg); padding:1rem 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:500; color:var(--color-text-primary);">Cola</span>
+        <code style="font-size:11px; color:#993C1D; background:#FAECE7; padding:2px 6px; border-radius:4px;">/cola</code>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <span style="font-size:13px; color:var(--color-text-secondary);">Tareas de activación pendientes (SSE)</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Asignación de tareas a clientes</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Filtros por urgencia y tipo</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Registro de actividad en tiempo real</span>
+      </div>
+    </div>
+
+    <div style="background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-left:3px solid #D85A30; border-radius:var(--border-radius-lg); padding:1rem 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:500; color:var(--color-text-primary);">Usuarios</span>
+        <code style="font-size:11px; color:#993C1D; background:#FAECE7; padding:2px 6px; border-radius:4px;">/usuarios</code>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <span style="font-size:13px; color:var(--color-text-secondary);">Lista y búsqueda de clientes</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Detalle: fase, entregables, tareas</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Avance manual de fase</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">URL por usuario: /usuarios/[id]</span>
+      </div>
+    </div>
+
+    <div style="background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-left:3px solid #D85A30; border-radius:var(--border-radius-lg); padding:1rem 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:500; color:var(--color-text-primary);">Fases</span>
+        <code style="font-size:11px; color:#993C1D; background:#FAECE7; padding:2px 6px; border-radius:4px;">/fases</code>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <span style="font-size:13px; color:var(--color-text-secondary);">Configuración del programa</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Orden y reglas de avance</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Plantillas de tareas por fase</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Nombres canónicos (enum único)</span>
+      </div>
+    </div>
+
+    <div style="background:var(--color-background-primary); border:0.5px solid var(--color-border-tertiary); border-left:3px solid #D85A30; border-radius:var(--border-radius-lg); padding:1rem 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+        <span style="font-size:15px; font-weight:500; color:var(--color-text-primary);">Config.</span>
+        <code style="font-size:11px; color:#993C1D; background:#FAECE7; padding:2px 6px; border-radius:4px;">/config</code>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:5px;">
+        <span style="font-size:13px; color:var(--color-text-secondary);">Settings globales del sistema</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">CORS, SSE y parámetros de API</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Gestión de roles y permisos</span>
+        <span style="font-size:13px; color:var(--color-text-secondary);">Notificaciones globales</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div>
+
+<script>
+function switchView(v) {
+  document.getElementById('view-cliente').style.display = v==='cliente' ? 'block' : 'none';
+  document.getElementById('view-director').style.display = v==='director' ? 'block' : 'none';
+  var bc = document.getElementById('btn-cliente');
+  var bd = document.getElementById('btn-director');
+  if(v==='cliente'){
+    bc.style.cssText = 'padding:6px 18px;border-radius:20px;border:1.5px solid #1D9E75;background:#E1F5EE;color:#0F6E56;font-size:13px;font-weight:500;cursor:pointer;';
+    bd.style.cssText = 'padding:6px 18px;border-radius:20px;border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-secondary);font-size:13px;font-weight:500;cursor:pointer;';
+  } else {
+    bd.style.cssText = 'padding:6px 18px;border-radius:20px;border:1.5px solid #D85A30;background:#FAECE7;color:#993C1D;font-size:13px;font-weight:500;cursor:pointer;';
+    bc.style.cssText = 'padding:6px 18px;border-radius:20px;border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-secondary);font-size:13px;font-weight:500;cursor:pointer;';
+  }
+}
+</script>

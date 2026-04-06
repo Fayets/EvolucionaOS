@@ -2,8 +2,92 @@
 
 import { useState } from "react"
 import Image from "next/image"
+import { Lock, Mail } from "lucide-react"
 import { useApp, type UserRole } from "@/lib/app-context"
 import { apiUrl, setToken } from "@/lib/api"
+
+/** PRNG determinístico para estrellas fijas entre SSR y cliente */
+function mulberry32(seed: number) {
+  return () => {
+    let t = (seed += 0x6d2b79f5)
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+type SpaceStar = { cx: number; cy: number; r: number; o: number; fill: string }
+
+/** Campo estrellado: motas más chicas (radios bajos en viewBox 1000×1000) */
+function buildSpaceStarfield(): SpaceStar[] {
+  const rand = mulberry32(0x9e3779b9)
+  const stars: SpaceStar[] = []
+
+  for (let i = 0; i < 1520; i++) {
+    const g = rand()
+    stars.push({
+      cx: rand() * 1000,
+      cy: rand() * 1000,
+      r: 0.1 + rand() * 0.32,
+      o: 0.1 + rand() * 0.42,
+      fill: g > 0.12 ? (g > 0.55 ? "#ffffff" : "#e4e4e8") : "#c4c4cc",
+    })
+  }
+  for (let i = 0; i < 220; i++) {
+    stars.push({
+      cx: rand() * 1000,
+      cy: rand() * 1000,
+      r: 0.32 + rand() * 0.42,
+      o: 0.26 + rand() * 0.4,
+      fill: rand() > 0.25 ? "#ffffff" : "#ddd6e8",
+    })
+  }
+  for (let i = 0; i < 42; i++) {
+    stars.push({
+      cx: rand() * 1000,
+      cy: rand() * 1000,
+      r: 0.55 + rand() * 0.55,
+      o: 0.42 + rand() * 0.48,
+      fill: "#ffffff",
+    })
+  }
+  return stars
+}
+
+const SPACE_STARS = buildSpaceStarfield()
+
+function LoginSpaceBackdrop() {
+  return (
+    <svg
+      className="pointer-events-none absolute inset-0 size-full"
+      viewBox="0 0 1000 1000"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden
+    >
+      {SPACE_STARS.map((s, i) => (
+        <circle key={i} cx={s.cx} cy={s.cy} r={s.r} fill={s.fill} opacity={s.o} />
+      ))}
+    </svg>
+  )
+}
+
+/** Nebulosa violeta/rosa suave a la derecha, como en el mockup */
+function LoginNebula() {
+  return (
+    <div
+      className="pointer-events-none absolute inset-0"
+      style={{
+        background: `
+          radial-gradient(ellipse 75% 90% at 96% 38%, rgba(130, 55, 155, 0.28) 0%, transparent 52%),
+          radial-gradient(ellipse 55% 75% at 88% 72%, rgba(90, 35, 110, 0.16) 0%, transparent 48%),
+          radial-gradient(ellipse 40% 55% at 100% 55%, rgba(180, 80, 140, 0.12) 0%, transparent 42%)
+        `,
+        mixBlendMode: "screen",
+        opacity: 0.72,
+      }}
+    />
+  )
+}
 
 function Spinner() {
   return (
@@ -18,7 +102,7 @@ function Spinner() {
         cy="12"
         r="10"
         stroke="currentColor"
-        strokeOpacity="0.2"
+        strokeOpacity="0.25"
         strokeWidth="2.5"
       />
       <path
@@ -76,7 +160,6 @@ export function LoginForm() {
     const mappedRole: UserRole = backendRole === "SISTEMAS" ? "director" : "client"
 
     const token = typeof data.access_token === "string" ? data.access_token : ""
-    // Guardar token antes del siguiente render: si no, useEffects hijos (lista usuarios, etc.) hacen fetch sin Authorization → 401.
     setToken(token || null)
     setAccessToken(token)
     setUserEmail(data.email ?? email)
@@ -89,183 +172,118 @@ export function LoginForm() {
     setIsLoggedIn(true)
   }
 
-  return (
-    <div className="fixed inset-0 flex items-center justify-center overflow-hidden" style={{ background: "#060606" }}>
-      {/* Subtle white spotlight */}
-      <div
-        className="pointer-events-none absolute"
-        style={{
-          width: "800px",
-          height: "600px",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%, -50%)",
-          background: "radial-gradient(ellipse at center, rgba(255, 255, 255, 0.03) 0%, transparent 65%)",
-          filter: "blur(60px)",
-        }}
-      />
+  const inputShell =
+    "flex h-12 w-full items-center gap-3 rounded-xl border border-white/[0.14] bg-transparent px-3.5 transition-[border-color,box-shadow] duration-200 focus-within:border-violet-400/45 focus-within:shadow-[0_0_0_1px_rgba(192,132,252,0.15)]"
 
-      {/* Noise grain overlay */}
+  const inputInner =
+    "min-w-0 flex-1 border-0 bg-transparent text-[15px] text-white placeholder:text-zinc-500 outline-none ring-0 focus:ring-0"
+
+  return (
+    <div className="fixed inset-0 overflow-hidden bg-black">
+      <LoginSpaceBackdrop />
+      <LoginNebula />
+
+      {/* PNG en public: login-silhouette.png — a la derecha; screen si el fondo del PNG es oscuro */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.015]"
+        className="pointer-events-none absolute bottom-0 right-[-6%] z-0 w-[min(88vw,460px)] sm:right-0 sm:w-[min(92vw,520px)]"
+        aria-hidden
+      >
+        <div className="mix-blend-screen opacity-[0.44] sm:opacity-[0.5]">
+          <Image
+            src="/login-silhouette.png"
+            alt=""
+            width={800}
+            height={800}
+            className="h-auto w-full object-contain object-bottom [filter:drop-shadow(0_0_24px_rgba(255,255,255,0.1))]"
+            priority
+          />
+        </div>
+      </div>
+
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.035]"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
           backgroundRepeat: "repeat",
           backgroundSize: "128px 128px",
         }}
       />
 
-      <div className="animate-login-enter flex flex-col items-center px-4 w-full max-w-[380px] relative z-10">
-        {/* Logo */}
-        <Image
-          src="/EvolucionaLogoLogin.png"
-          alt="Evoluciona"
-          width={140}
-          height={140}
-          priority
-        />
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="flex flex-col gap-6 w-full">
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="login-email"
-              className="text-[13px] font-medium pl-1"
-              style={{ color: "#777" }}
-            >
-              Email
-            </label>
-            <input
-              id="login-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tu@email.com"
-              required
-              autoComplete="email"
-              className="h-12 w-full rounded-[14px] px-4 text-[15px] font-medium outline-none transition-all duration-200"
-              style={{
-                color: "#eaeaea",
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                boxShadow: "0 6px 24px -4px rgba(0, 0, 0, 0.5)",
-                backdropFilter: "blur(4px)",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)"
-                e.currentTarget.style.boxShadow = "0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 16px rgba(255, 255, 255, 0.03), 0 6px 24px -4px rgba(0, 0, 0, 0.5)"
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)"
-                e.currentTarget.style.boxShadow = "0 6px 24px -4px rgba(0, 0, 0, 0.5)"
-              }}
+      <div className="relative z-10 flex min-h-dvh flex-col items-center justify-center px-4 py-10 sm:py-14">
+        <div className="animate-login-enter flex w-full max-w-[420px] flex-col items-center">
+          <div className="mb-4 flex justify-center sm:mb-5">
+            <Image
+              src="/EvolucionaLogoLogin.png"
+              alt="Evoluciona"
+              width={140}
+              height={140}
+              className="h-[120px] w-auto object-contain brightness-0 invert sm:h-[140px]"
+              priority
             />
           </div>
 
-          <div className="flex flex-col gap-2">
-            <label
-              htmlFor="login-password"
-              className="text-[13px] font-medium pl-1"
-              style={{ color: "#777" }}
-            >
-              Contraseña
-            </label>
-            <input
-              id="login-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-              autoComplete="current-password"
-              className="h-12 w-full rounded-[14px] px-4 text-[15px] font-medium outline-none transition-all duration-200"
-              style={{
-                color: "#eaeaea",
-                background: "rgba(255, 255, 255, 0.04)",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                boxShadow: "0 6px 24px -4px rgba(0, 0, 0, 0.5)",
-                backdropFilter: "blur(4px)",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.14)"
-                e.currentTarget.style.boxShadow = "0 0 0 1px rgba(255, 255, 255, 0.08), 0 0 16px rgba(255, 255, 255, 0.03), 0 6px 24px -4px rgba(0, 0, 0, 0.5)"
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)"
-                e.currentTarget.style.boxShadow = "0 6px 24px -4px rgba(0, 0, 0, 0.5)"
-              }}
-            />
-          </div>
+          <div className="w-full bg-transparent p-7 backdrop-blur-md sm:p-8">
+            <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+              <div className={inputShell}>
+                <Mail className="size-[18px] shrink-0 text-zinc-400" aria-hidden />
+                <input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                  required
+                  autoComplete="email"
+                  aria-label="Email"
+                  className={inputInner}
+                />
+              </div>
 
-          {/* Submit */}
-          <div className="relative mt-3">
-            <div
-              className="pointer-events-none absolute inset-x-8 -bottom-1 h-8 transition-all duration-200"
-              style={{
-                background: "radial-gradient(ellipse at center, rgba(0, 0, 0, 0.5) 0%, transparent 70%)",
-                filter: "blur(16px)",
-              }}
-              id="btn-glow"
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              className="relative w-full h-[52px] cursor-pointer rounded-2xl text-[15px] font-semibold outline-none disabled:pointer-events-none disabled:opacity-60"
-              style={{
-                color: "#e0e0e0",
-                background: "linear-gradient(180deg, #1a1a1e 0%, #131315 50%, #0d0d0f 100%)",
-                boxShadow: "0 4px 16px rgba(0, 0, 0, 0.6), 0 8px 32px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.3)",
-                border: "1px solid rgba(255, 255, 255, 0.06)",
-                transform: "translateY(0)",
-                transition: "transform 200ms cubic-bezier(0.33, 1, 0.68, 1), box-shadow 200ms ease, filter 200ms ease, border-color 200ms ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)"
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.1)"
-                e.currentTarget.style.boxShadow = "0 8px 28px rgba(0, 0, 0, 0.6), 0 12px 44px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -1px 0 rgba(0, 0, 0, 0.3)"
-                const glow = e.currentTarget.parentElement?.querySelector("#btn-glow") as HTMLElement | null
-                if (glow) { glow.style.opacity = "1.3"; glow.style.filter = "blur(20px)" }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)"
-                e.currentTarget.style.borderColor = "rgba(255, 255, 255, 0.06)"
-                e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 0, 0, 0.6), 0 8px 32px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.3)"
-                const glow = e.currentTarget.parentElement?.querySelector("#btn-glow") as HTMLElement | null
-                if (glow) { glow.style.opacity = "1"; glow.style.filter = "blur(16px)" }
-              }}
-              onMouseDown={(e) => {
-                e.currentTarget.style.transform = "translateY(1px)"
-                const glow = e.currentTarget.parentElement?.querySelector("#btn-glow") as HTMLElement | null
-                if (glow) { glow.style.opacity = "0.6"; glow.style.filter = "blur(12px)" }
-              }}
-              onMouseUp={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)"
-                const glow = e.currentTarget.parentElement?.querySelector("#btn-glow") as HTMLElement | null
-                if (glow) { glow.style.opacity = "1.3"; glow.style.filter = "blur(20px)" }
-              }}
-            >
-              {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <Spinner />
-                  <span>Ingresando…</span>
-                </span>
-              ) : (
-                "Ingresar"
+              <div className={inputShell}>
+                <Lock className="size-[18px] shrink-0 text-zinc-400" aria-hidden />
+                <input
+                  id="login-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                  aria-label="Contraseña"
+                  className={inputInner}
+                />
+              </div>
+
+              <div className="pt-1">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex h-[52px] w-full cursor-pointer items-center justify-center rounded-xl text-[15px] font-semibold text-zinc-950 shadow-[0_0_24px_-4px_rgba(168,85,247,0.55)] outline-none transition-[filter,transform,opacity] duration-200 hover:brightness-105 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-60"
+                  style={{
+                    background: "linear-gradient(90deg, #a855f7, #c084fc)",
+                  }}
+                >
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2 text-zinc-900">
+                      <Spinner />
+                      <span>Ingresando…</span>
+                    </span>
+                  ) : (
+                    "Ingresar"
+                  )}
+                </button>
+              </div>
+
+              {error && (
+                <p className="text-center text-[13px] text-red-400/90">{error}</p>
               )}
-            </button>
+            </form>
           </div>
 
-          {/* Error */}
-          {error && (
-            <p className="text-[13px] text-red-400/80 text-center">
-              {error}
-            </p>
-          )}
-        </form>
-
-        {/* Footer */}
-        <p className="mt-10 text-center text-[12px] tracking-wide" style={{ color: "#444" }}>
-          Acceso seguro · Evoluciona OS
-        </p>
+          <p className="mt-10 max-w-md text-center text-[10px] font-medium tracking-[0.2em] text-zinc-500 uppercase sm:text-[11px]">
+            © 2026 EvolucionaOS. Crafted for evolution.
+          </p>
+        </div>
       </div>
     </div>
   )

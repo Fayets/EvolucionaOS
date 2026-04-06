@@ -6,8 +6,8 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  images: {
-    unoptimized: true,
+  experimental: {
+    optimizePackageImports: ["lucide-react"],
   },
   async rewrites() {
     return [

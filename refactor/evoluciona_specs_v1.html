@@ -1,0 +1,292 @@
+
+<style>
+.sb{display:block;width:100%;text-align:left;padding:7px 14px;border:none;cursor:pointer;font-size:12px;color:var(--color-text-secondary);background:transparent;}
+.sb:hover{background:var(--color-background-primary);color:var(--color-text-primary);}
+.sb.on{background:var(--color-background-primary);color:var(--color-text-primary);font-weight:500;}
+</style>
+
+<div style="display:flex;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden;">
+  <div style="width:148px;flex-shrink:0;border-right:0.5px solid var(--color-border-tertiary);background:var(--color-background-secondary);">
+    <div style="padding:10px 14px 4px;font-size:10px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:.06em;">CLIENTE</div>
+    <button class="sb on" id="n0" onclick="go(0)">Inicio</button>
+    <button class="sb" id="n1" onclick="go(1)">Programa</button>
+    <button class="sb" id="n2" onclick="go(2)">Tareas</button>
+    <button class="sb" id="n3" onclick="go(3)">Perfil</button>
+    <div style="height:0.5px;background:var(--color-border-tertiary);margin:5px 0;"></div>
+    <div style="padding:6px 14px 4px;font-size:10px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:.06em;">DIRECTOR</div>
+    <button class="sb" id="n4" onclick="go(4)">Cola</button>
+    <button class="sb" id="n5" onclick="go(5)">Usuarios</button>
+    <button class="sb" id="n6" onclick="go(6)" style="padding-left:20px;font-size:11px;">&#8627; /[id]</button>
+    <button class="sb" id="n7" onclick="go(7)">Fases</button>
+    <button class="sb" id="n8" onclick="go(8)">Config.</button>
+  </div>
+  <div id="rp" style="flex:1;padding:1.25rem 1.5rem;min-width:0;"></div>
+</div>
+
+<script>
+var TC='#1D9E75',TL='rgba(29,158,117,0.09)',TT='#0F6E56';
+var DC='#D85A30',DL='rgba(216,90,48,0.09)',DT='#712B13';
+
+function sk(w){return '<div style="height:8px;border-radius:2px;background:var(--color-background-secondary);width:'+(w||'80%')+';margin-bottom:4px;"></div>';}
+
+function wb(lbl,s,inner){
+  return '<div style="border:0.5px dashed var(--color-border-secondary);border-radius:4px;background:var(--color-background-primary);padding:6px;'+(s||'')+'">'+(lbl?'<div style="font-size:9px;color:var(--color-text-tertiary);margin-bottom:4px;">'+lbl+'</div>':'')+(inner||'')+'</div>';
+}
+
+function cb(lbl,c,bg,s,inner){
+  return '<div style="border:0.5px dashed '+c+';border-radius:4px;background:'+bg+';padding:6px;'+(s||'')+'"><div style="font-size:9px;color:'+c+';font-weight:500;margin-bottom:4px;">'+lbl+'</div>'+(inner||'')+'</div>';
+}
+
+function tbar(tabs,ai,c,bg){
+  var items=tabs.map(function(t,i){return '<div style="flex:1;padding:5px;text-align:center;font-size:9px;color:'+(i===ai?c:'var(--color-text-tertiary)')+';background:'+(i===ai?bg:'var(--color-background-primary)')+';'+(i>0?'border-left:0.5px solid var(--color-border-tertiary);':'')+'">' +t+'</div>';});
+  return '<div style="display:flex;border:0.5px solid var(--color-border-tertiary);border-radius:4px;overflow:hidden;">'+items.join('')+'</div>';
+}
+
+function dots(ps,done,c){
+  var out='<div style="display:flex;align-items:center;">';
+  for(var i=0;i<ps.length;i++){
+    out+='<div style="display:flex;flex-direction:column;align-items:center;gap:2px;"><div style="width:12px;height:12px;border-radius:50%;background:'+(i<done?c:'var(--color-background-secondary)')+';border:1.5px solid '+(i<=done?c:'var(--color-border-secondary)')+';flex-shrink:0;"></div><span style="font-size:8px;color:'+(i<done?c:'var(--color-text-tertiary)')+';">'+ps[i]+'</span></div>';
+    if(i<ps.length-1) out+='<div style="flex:1;height:1.5px;background:'+(i<done?c:'var(--color-border-secondary)')+';margin-top:-14px;"></div>';
+  }
+  return out+'</div>';
+}
+
+function sh(role,act,main){
+  var nav=role==='c'?['Inicio','Programa','Tareas','Perfil']:['Cola','Usuarios','Fases','Config.'];
+  var ac=role==='c'?TC:DC,abg=role==='c'?TL:DL;
+  var ni='';
+  for(var i=0;i<nav.length;i++){
+    var on=nav[i]===act;
+    ni+='<div style="padding:4px 6px;border-radius:3px;margin-bottom:2px;background:'+(on?abg:'transparent')+'"><span style="font-size:9px;color:'+(on?ac:'var(--color-text-tertiary)')+';">'+nav[i]+'</span></div>';
+  }
+  return '<div style="border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);overflow:hidden;background:var(--color-background-secondary);">'
+    +'<div style="height:28px;background:var(--color-background-primary);border-bottom:0.5px solid var(--color-border-tertiary);display:flex;align-items:center;padding:0 10px;gap:6px;">'
+    +'<div style="width:12px;height:12px;border-radius:2px;background:'+abg+';border:0.5px solid '+ac+';"></div>'
+    +'<span style="font-size:9px;font-weight:500;color:var(--color-text-tertiary);flex:1;">EvolucionaOS</span>'
+    +'<div style="width:14px;height:14px;border-radius:50%;background:'+abg+';border:0.5px solid '+ac+';"></div>'
+    +'</div>'
+    +'<div style="display:flex;min-height:185px;">'
+    +'<div style="width:80px;flex-shrink:0;background:var(--color-background-primary);border-right:0.5px solid var(--color-border-tertiary);padding:7px 5px;">'+ni+'</div>'
+    +'<div style="flex:1;padding:8px;display:flex;flex-direction:column;gap:5px;overflow:hidden;">'+main+'</div>'
+    +'</div></div>';
+}
+
+function mkCard(title,items,color){
+  var h='<div style="background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:12px 14px;"><div style="font-size:10px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:.06em;text-transform:uppercase;margin-bottom:10px;">'+title+'</div>';
+  for(var i=0;i<items.length;i++){
+    var it=items[i];
+    if(typeof it==='object'){
+      var cl=i===0?color:i===1?color+'99':'var(--color-border-secondary)';
+      var lb=['Primario','Secundario','Terciario'][i];
+      h+='<div style="display:flex;gap:7px;align-items:flex-start;margin-bottom:8px;"><div style="width:7px;height:7px;border-radius:50%;background:'+cl+';flex-shrink:0;margin-top:4px;"></div><div><div style="font-size:11px;font-weight:500;color:var(--color-text-primary);margin-bottom:1px;">'+lb+'</div><div style="font-size:12px;color:var(--color-text-secondary);">'+it.t+'</div></div></div>';
+    } else {
+      h+='<div style="font-size:12px;color:var(--color-text-secondary);padding:3px 0;border-bottom:0.5px solid var(--color-border-tertiary);">'+it+'</div>';
+    }
+  }
+  return h+'</div>';
+}
+
+var userRows=[['Ana García','Onboarding','3'],['Carlos Ruiz','Fase 1','1'],['María López','Plataformas','2']];
+
+var W=[];
+W[0]=sh('c','Inicio',
+  cb('Bienvenida · barra de progreso global',TC,TL,'','<div style="height:4px;border-radius:2px;background:rgba(255,255,255,0.4);overflow:hidden;margin-top:2px;"><div style="width:35%;height:100%;background:'+TC+';"></div></div>')
+  +'<div style="display:flex;gap:5px;flex:1;">'
+  +wb('Feed de notificaciones','flex:3;',sk()+sk('70%')+sk('85%')+sk('50%'))
+  +'<div style="flex:2;display:flex;flex-direction:column;gap:5px;">'
+  +cb('Tareas pendientes',TC,TL,'flex:1;','<div style="font-size:20px;color:'+TC+';font-weight:500;line-height:1.2;">3</div><div style="font-size:8px;color:'+TT+';">pendientes</div>')
+  +wb('Próximo hito','flex:1;',sk('80%'))
+  +'</div></div>'
+);
+
+W[1]=sh('c','Programa',
+  wb('Timeline de fases','',dots(['Inicio','Plat.','Onboard.','Fase 1','Fase 2'],2,TC))
+  +'<div style="display:flex;gap:5px;flex:1;">'
+  +cb('Fase activa — detalle',TC,TL,'flex:2;',sk('90%')+sk('70%')+sk('50%'))
+  +wb('Entregables de la fase','flex:3;',
+    '<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;"><div style="width:9px;height:9px;border-radius:2px;border:0.5px solid '+TC+';background:'+TL+';flex-shrink:0;"></div><span style="font-size:9px;">Formulario datos</span></div>'
+    +'<div style="display:flex;align-items:center;gap:4px;margin-bottom:4px;"><div style="width:9px;height:9px;border-radius:2px;border:0.5px solid var(--color-border-secondary);flex-shrink:0;"></div><span style="font-size:9px;color:var(--color-text-tertiary);">Conectar Instagram</span></div>'
+    +'<div style="display:flex;align-items:center;gap:4px;"><div style="width:9px;height:9px;border-radius:2px;border:0.5px solid var(--color-border-secondary);flex-shrink:0;"></div><span style="font-size:9px;color:var(--color-text-tertiary);">Ver video intro</span></div>'
+  )
+  +'</div>'
+);
+
+W[2]=sh('c','Tareas',
+  tbar(['Obligatorias (3)','De activación (1)'],0,TC,TL)
+  +'<div style="display:flex;flex-direction:column;gap:4px;flex:1;">'
+  +'<div style="border:0.5px solid '+TC+';border-radius:4px;background:'+TL+';padding:5px 8px;display:flex;align-items:center;justify-content:space-between;"><div><div style="font-size:8px;display:inline-block;padding:1px 4px;border-radius:2px;background:'+TL+';color:'+TC+';margin-bottom:2px;">PENDIENTE</div><div style="font-size:9px;">Completar formulario de datos</div></div><div style="padding:3px 7px;border-radius:3px;background:'+TC+';font-size:8px;color:white;">Completar</div></div>'
+  +'<div style="border:0.5px solid '+TC+';border-radius:4px;background:'+TL+';padding:5px 8px;display:flex;align-items:center;justify-content:space-between;"><div><div style="font-size:8px;display:inline-block;padding:1px 4px;border-radius:2px;background:'+TL+';color:'+TC+';margin-bottom:2px;">PENDIENTE</div><div style="font-size:9px;">Conectar cuenta de Instagram</div></div><div style="padding:3px 7px;border-radius:3px;background:'+TC+';font-size:8px;color:white;">Completar</div></div>'
+  +'<div style="border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:5px 8px;"><div style="font-size:8px;display:inline-block;padding:1px 4px;border-radius:2px;background:var(--color-background-secondary);color:var(--color-text-tertiary);margin-bottom:2px;">COMPLETADO</div><div style="font-size:9px;color:var(--color-text-tertiary);">Ver video de bienvenida</div></div>'
+  +'</div>'
+);
+
+W[3]=sh('c','Perfil',
+  '<div style="display:flex;align-items:center;gap:8px;border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:7px;">'
+  +'<div style="width:28px;height:28px;border-radius:50%;background:'+TL+';border:1.5px solid '+TC+';display:flex;align-items:center;justify-content:center;font-size:9px;color:'+TT+';font-weight:500;">JD</div>'
+  +'<div>'+sk('100px')+sk('130px')+'</div></div>'
+  +wb('Datos personales — editables','',sk('80%')+sk('60%'))
+  +cb('Plataformas conectadas',TC,TL,'',
+    '<div style="display:flex;gap:4px;">'
+    +'<div style="padding:2px 6px;border-radius:3px;background:'+TC+';border:0.5px solid '+TC+';font-size:8px;color:white;">FB</div>'
+    +'<div style="padding:2px 6px;border-radius:3px;background:'+TC+';border:0.5px solid '+TC+';font-size:8px;color:white;">IG</div>'
+    +'<div style="padding:2px 6px;border-radius:3px;background:'+TL+';border:0.5px solid '+TC+';font-size:8px;color:'+TT+';">YT</div>'
+    +'<div style="padding:2px 6px;border-radius:3px;background:'+TL+';border:0.5px solid '+TC+';font-size:8px;color:'+TT+';">TK</div>'
+    +'</div>'
+  )
+  +wb('Notificaciones · preferencias','',
+    '<div style="display:flex;justify-content:space-between;align-items:center;">'+sk('55%')+'<div style="width:20px;height:10px;border-radius:5px;background:'+TC+';"></div></div>'
+  )
+);
+
+W[4]=sh('d','Cola',
+  '<div style="display:flex;gap:5px;">'
+  +'<div style="flex:1;border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:6px;text-align:center;"><div style="font-size:16px;font-weight:500;color:'+DC+';">12</div><div style="font-size:8px;color:var(--color-text-tertiary);">Pendientes</div></div>'
+  +'<div style="flex:1;border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:6px;text-align:center;"><div style="font-size:16px;font-weight:500;color:#F0997B;">5</div><div style="font-size:8px;color:var(--color-text-tertiary);">Hoy</div></div>'
+  +'<div style="flex:1;border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:6px;text-align:center;"><div style="font-size:16px;font-weight:500;color:var(--color-text-secondary);">2.4h</div><div style="font-size:8px;color:var(--color-text-tertiary);">Tiempo med.</div></div>'
+  +'</div>'
+  +'<div style="display:flex;gap:5px;flex:1;">'
+  +'<div style="flex:3;display:flex;flex-direction:column;gap:4px;">'
+  +'<div style="border:0.5px solid '+DC+';border-radius:4px;background:'+DL+';padding:5px 7px;display:flex;justify-content:space-between;align-items:center;"><span style="font-size:9px;">Cliente A — Formulario onboarding</span><div style="padding:2px 6px;border-radius:2px;background:'+DC+';font-size:7px;color:white;">Asignar</div></div>'
+  +'<div style="border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:5px 7px;"><span style="font-size:9px;">Cliente B — Conectar plataformas</span></div>'
+  +'<div style="border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:5px 7px;"><span style="font-size:9px;">Cliente C — Revisar entregable</span></div>'
+  +'</div>'
+  +wb('Detalle tarea seleccionada','flex:2;',sk('90%')+sk('70%')+sk('50%'))
+  +'</div>'
+);
+
+var tableRows='';
+for(var i=0;i<userRows.length;i++){
+  var u=userRows[i];
+  tableRows+='<div style="display:grid;grid-template-columns:1fr 80px 65px 40px;padding:5px 8px;border-bottom:0.5px solid var(--color-border-tertiary);align-items:center;"><div style="display:flex;align-items:center;gap:4px;"><div style="width:14px;height:14px;border-radius:50%;background:'+DL+';border:0.5px solid #F0997B;font-size:7px;color:'+DC+';display:flex;align-items:center;justify-content:center;">'+u[0][0]+'</div><span style="font-size:9px;color:var(--color-text-primary);">'+u[0]+'</span></div><span style="font-size:8px;padding:2px 5px;border-radius:3px;background:'+DL+';color:'+DT+';">'+u[1]+'</span><span style="font-size:9px;color:var(--color-text-secondary);">'+u[2]+' pend.</span><div style="width:24px;height:14px;border-radius:3px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);"></div></div>';
+}
+
+W[5]=sh('d','Usuarios',
+  '<div style="display:flex;gap:5px;align-items:center;">'
+  +'<div style="flex:1;border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:5px 8px;font-size:9px;color:var(--color-text-tertiary);">Buscar usuario...</div>'
+  +'<div style="padding:4px 8px;border-radius:3px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);font-size:8px;color:var(--color-text-secondary);">Fase</div>'
+  +'<div style="padding:4px 8px;border-radius:3px;background:'+DC+';font-size:8px;color:white;">+ Usuario</div>'
+  +'</div>'
+  +'<div style="flex:1;border:0.5px solid var(--color-border-tertiary);border-radius:4px;overflow:hidden;background:var(--color-background-primary);">'
+  +'<div style="display:grid;grid-template-columns:1fr 80px 65px 40px;padding:4px 8px;background:var(--color-background-secondary);border-bottom:0.5px solid var(--color-border-tertiary);"><span style="font-size:8px;font-weight:500;color:var(--color-text-tertiary);">Usuario</span><span style="font-size:8px;font-weight:500;color:var(--color-text-tertiary);">Fase</span><span style="font-size:8px;font-weight:500;color:var(--color-text-tertiary);">Tareas</span><span style="font-size:8px;font-weight:500;color:var(--color-text-tertiary);">—</span></div>'
+  +tableRows
+  +'</div>'
+);
+
+W[6]=sh('d','Usuarios',
+  '<div style="border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:6px 8px;display:flex;align-items:center;justify-content:space-between;">'
+  +'<div style="display:flex;align-items:center;gap:6px;">'
+  +'<span style="font-size:8px;color:var(--color-text-tertiary);">&#8592; Usuarios</span>'
+  +'<div style="width:22px;height:22px;border-radius:50%;background:'+DL+';border:1px solid '+DC+';display:flex;align-items:center;justify-content:center;font-size:8px;color:'+DC+';font-weight:500;">AG</div>'
+  +'<div><div style="font-size:9px;font-weight:500;color:var(--color-text-primary);">Ana García</div><div style="font-size:8px;color:var(--color-text-tertiary);">ana@email.com</div></div>'
+  +'<span style="font-size:8px;padding:2px 5px;border-radius:3px;background:'+DL+';color:'+DT+';">Onboarding</span>'
+  +'</div>'
+  +'<div style="padding:3px 8px;border-radius:3px;background:'+DC+';font-size:8px;color:white;">Avanzar fase &#8594;</div>'
+  +'</div>'
+  +tbar(['Progreso','Tareas','Actividad'],0,DC,DL)
+  +cb('Timeline de fases de este usuario',DC,DL,'',dots(['Inicio','Plat.','Onboard.','Fase 1'],2,DC))
+  +wb('Entregables de la fase actual','flex:1;',sk('80%')+sk('55%'))
+);
+
+var phaseCards='';
+var fdata=[['1. Inicio','Siempre activa','2 tareas',true],['2. Plataformas','Requiere: Inicio','3 tareas',false],['3. Onboarding','Req: Plataformas','4 tareas',false]];
+for(var i=0;i<fdata.length;i++){
+  var f=fdata[i];
+  phaseCards+='<div style="border:0.5px solid '+(f[3]?DC:'var(--color-border-tertiary)')+';border-radius:4px;background:var(--color-background-primary);">'
+  +'<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;">'
+  +'<div style="display:flex;align-items:center;gap:6px;"><div style="width:14px;height:14px;border-radius:3px;background:'+(f[3]?DC:'var(--color-background-secondary)')+';display:flex;align-items:center;justify-content:center;font-size:7px;color:'+(f[3]?'white':'var(--color-text-tertiary)')+';">'+f[0][0]+'</div>'
+  +'<span style="font-size:9px;font-weight:500;color:var(--color-text-primary);">'+f[0]+'</span>'
+  +'<span style="font-size:8px;color:var(--color-text-tertiary);">'+f[2]+'</span></div>'
+  +'<span style="font-size:8px;color:var(--color-text-tertiary);">'+f[1]+'</span></div>'
+  +(f[3]?'<div style="border-top:0.5px solid var(--color-border-tertiary);padding:5px 8px;">'+sk('70%')+sk('50%')+'</div>':'')
+  +'</div>';
+}
+
+W[7]=sh('d','Fases',
+  '<div style="display:flex;justify-content:space-between;align-items:center;">'
+  +'<span style="font-size:9px;font-weight:500;color:var(--color-text-primary);">5 fases configuradas</span>'
+  +'<div style="padding:3px 8px;border-radius:3px;background:'+DC+';font-size:8px;color:white;">+ Nueva fase</div>'
+  +'</div>'
+  +phaseCards
+);
+
+var cfgItems='';
+var cfgData=[['Nombre del programa','EvolucionaOS'],['URL del backend','https://api...'],['Modo de registro','Abierto']];
+for(var i=0;i<cfgData.length;i++){
+  cfgItems+='<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary);"><span style="font-size:8px;color:var(--color-text-tertiary);">'+cfgData[i][0]+'</span><span style="font-size:8px;color:var(--color-text-primary);">'+cfgData[i][1]+'</span></div>';
+}
+
+var cfgNav='';
+var cfgSections=['General','Notif.','CORS/API','Roles'];
+for(var i=0;i<cfgSections.length;i++){
+  cfgNav+='<div style="padding:4px 6px;border-radius:3px;margin-bottom:2px;background:'+(i===0?DL:'transparent')+'"><span style="font-size:9px;color:'+(i===0?DC:'var(--color-text-tertiary)')+';">'+cfgSections[i]+'</span></div>';
+}
+
+W[8]=sh('d','Config.',
+  '<div style="display:flex;gap:6px;flex:1;">'
+  +'<div style="width:80px;flex-shrink:0;border:0.5px solid var(--color-border-tertiary);border-radius:4px;background:var(--color-background-primary);padding:5px;">'+cfgNav+'</div>'
+  +'<div style="flex:1;display:flex;flex-direction:column;gap:5px;">'
+  +wb('General — sección activa','',cfgItems)
+  +'<div style="display:flex;justify-content:flex-end;gap:5px;">'
+  +'<div style="padding:4px 8px;border-radius:3px;background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);font-size:8px;color:var(--color-text-secondary);">Resetear</div>'
+  +'<div style="padding:4px 8px;border-radius:3px;background:'+DC+';font-size:8px;color:white;">Guardar</div>'
+  +'</div></div></div>'
+);
+
+var SCREENS=[
+  {url:'/cliente/inicio',role:'c',color:TC,wf:W[0],
+   comp:['Saludo personalizado + fecha actual','Barra de progreso del programa (% global)','Feed de notificaciones con timestamps','Card "Tareas pendientes" con contador y CTA','Card "Próximo hito" — qué se desbloquea al avanzar'],
+   hier:[{t:'Barra de progreso — ubica al cliente en el programa'},{t:'Feed de notificaciones — primera acción al entrar'},{t:'Cards de acceso rápido a tareas y programa'}],
+   act:['Click en notificación → navega al módulo relevante','Click en card de tareas → /cliente/tareas','Click en "Ver programa" → /cliente/programa','Descartar notificación individual','Scroll en el feed para ver historial']},
+  {url:'/cliente/programa',role:'c',color:TC,wf:W[1],
+   comp:['Timeline horizontal de fases con dots y línea conectora','Badge por fase: bloqueado · activo · completado','Card de detalle de la fase seleccionada','Lista de entregables con checkboxes','Formulario de entrega en modal o panel','Tooltip en fases bloqueadas con el requisito'],
+   hier:[{t:'Timeline — orienta toda la pantalla, siempre visible arriba'},{t:'Entregables de la fase activa — única área de acción'},{t:'Fases bloqueadas y completadas en segundo plano'}],
+   act:['Click en punto del timeline → carga detalle de esa fase','Click en entregable → abre formulario o instrucciones','Submit de entregable → marca como completado','Hover en fase bloqueada → tooltip con requisito']},
+  {url:'/cliente/tareas',role:'c',color:TC,wf:W[2],
+   comp:['Tab bar (Obligatorias | De activación) con contador','Cards de tarea: badge de estado + título + botón acción','Pendientes arriba, completadas al fondo atenuadas','Modal o panel con formulario de entrega','Estado vacío con mensaje si todo está completado'],
+   hier:[{t:'Tab activo con contador — orienta la cantidad de trabajo'},{t:'Tareas pendientes al tope, ordenadas por urgencia'},{t:'Tareas completadas al fondo, dimmed'}],
+   act:['Cambiar tab para filtrar tipo de tarea','Click en tarea → expande detalle o formulario','Submit de formulario → marca tarea completada','Click en completada → ver historial de entrega']},
+  {url:'/cliente/perfil',role:'c',color:TC,wf:W[3],
+   comp:['Header: avatar con iniciales + nombre + email','Datos personales con edición inline por campo','Grid de plataformas: conectada / no conectada','Botón de conexión por plataforma','Toggles de preferencias de notificación','Sección de seguridad — cambio de contraseña'],
+   hier:[{t:'Plataformas conectadas — mayor frecuencia, parte del onboarding'},{t:'Datos personales — edición eventual'},{t:'Notificaciones y seguridad — configuración puntual'}],
+   act:['Editar campo de datos (inline)','Conectar plataforma → flujo de conexión','Desconectar plataforma (con confirmación)','Toggle de preferencia de notificación','Cambiar contraseña']},
+  {url:'/director/cola',role:'d',color:DC,wf:W[4],
+   comp:['Métricas: pendientes, asignadas hoy, tiempo medio','Lista de tareas con cliente, tipo y prioridad','Badge de prioridad por tarea','Panel lateral de detalle al seleccionar','Botón Asignar / Completar por tarea','Badge SSE "En vivo" en el header'],
+   hier:[{t:'Lista de tareas pendientes — core del módulo, acción inmediata'},{t:'Panel de detalle al seleccionar tarea'},{t:'Métricas como contexto rápido arriba'}],
+   act:['Click en tarea → abre panel de detalle','Asignar tarea a cliente','Marcar tarea como completada','Filtrar por tipo o prioridad','Actualizaciones automáticas vía SSE']},
+  {url:'/director/usuarios',role:'d',color:DC,wf:W[5],
+   comp:['Búsqueda + filtro por fase + botón "Registrar usuario"','Tabla: avatar · nombre · fase · tareas pendientes · acciones','Badge de fase coloreado por fila','Botones ver detalle y avanzar fase rápida','Paginación o scroll infinito'],
+   hier:[{t:'Tabla de usuarios — ocupa toda la pantalla'},{t:'Búsqueda y filtros al tope como herramientas'},{t:'Acciones por fila como elementos terciarios'}],
+   act:['Buscar por nombre o email','Filtrar por fase','Click en fila → /director/usuarios/[id]','Avanzar fase desde la lista (acción rápida)','Registrar nuevo usuario (modal)']},
+  {url:'/director/usuarios/[id]',role:'d',color:DC,wf:W[6],
+   comp:['Header: avatar + nombre + email + fase + "Avanzar fase"','Botón de regreso a /director/usuarios','Tab bar: Progreso · Tareas · Actividad','Timeline de fases personalizado para este usuario','Lista de entregables con estado por fase','Log de actividad cronológico con timestamps','Modal de confirmación para avanzar fase'],
+   hier:[{t:'"Avanzar fase" — acción principal, siempre visible en el header'},{t:'Timeline de fases — contexto del recorrido del cliente'},{t:'Entregables y actividad como soporte'}],
+   act:['Avanzar usuario a siguiente fase (con confirmación)','Ver y descargar entregables por fase','Asignar tarea específica a este usuario','Ver log completo de actividad','Volver a /director/usuarios']},
+  {url:'/director/fases',role:'d',color:DC,wf:W[7],
+   comp:['Header: título + botón "Nueva fase"','Lista ordenada y numerada de fases','Card de fase colapsable/expandible','Requisito de desbloqueo por fase','Tareas dentro de cada fase (al expandir)','Drag handle o flechas para reordenar','Botones Editar / Eliminar por fase'],
+   hier:[{t:'Orden numérico — la posición en la lista ES la config del programa'},{t:'Contenido de cada fase visible al expandir'},{t:'Controles de edición como elementos terciarios'}],
+   act:['Expandir/colapsar fase para ver detalle','Reordenar fases (drag o flechas)','Editar nombre, descripción o requisitos','Agregar/quitar tareas de una fase','Crear nueva fase (modal)','Eliminar fase con confirmación']},
+  {url:'/director/config',role:'d',color:DC,wf:W[8],
+   comp:['Sub-nav vertical: General · Notif. · CORS/API · Roles','Formulario de settings por sección','Toggles para configuraciones booleanas','Botones Guardar / Resetear al fondo','Sección Roles con permisos editables','Zona de peligro al fondo de cada sección'],
+   hier:[{t:'Sección activa — 75% del ancho, contenido central'},{t:'Sub-nav para cambiar de sección'},{t:'Botones de guardado siempre visibles al fondo'}],
+   act:['Navegar entre secciones','Editar valor de setting (inline)','Guardar sección','Resetear a valores por defecto','Editar permisos por rol','Gestionar orígenes CORS']}
+];
+
+function go(idx){
+  var btns=document.querySelectorAll('.sb');
+  for(var i=0;i<btns.length;i++) btns[i].classList.toggle('on',i===idx);
+  var s=SCREENS[idx];
+  var rp=document.getElementById('rp');
+  if(!rp||!s) return;
+  var h='<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;">'
+    +'<code style="font-size:13px;font-weight:500;background:var(--color-background-secondary);padding:4px 12px;border-radius:6px;color:var(--color-text-primary);">'+s.url+'</code>'
+    +'<span style="font-size:11px;padding:3px 10px;border-radius:10px;background:'+(s.role==='c'?TL:DL)+';color:'+(s.role==='c'?TT:DT)+';font-weight:500;">'+(s.role==='c'?'cliente':'director')+'</span>'
+    +'</div>';
+  var g='<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:1rem;">'
+    +mkCard('Componentes visibles',s.comp,s.color)
+    +mkCard('Jerarqu\xEDa visual',s.hier,s.color)
+    +mkCard('Acciones del usuario',s.act,s.color)
+    +'</div>';
+  rp.innerHTML=h+s.wf+g;
+}
+go(0);
+</script>
