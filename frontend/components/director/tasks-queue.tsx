@@ -1,11 +1,12 @@
 "use client"
 
-import { useState, useEffect, useCallback, type ReactNode } from "react"
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
+import { ClipboardList, Calendar } from "lucide-react"
 import { ACTIVATION_TASKS_CHANGED } from "@/lib/use-activation-tasks-sse"
 import { apiFetch } from "@/lib/api"
+import { useRegisteredUsers } from "@/lib/registered-users-context"
 
 interface DirectorTask {
   id: string
@@ -48,9 +49,55 @@ function sortTasksNewestFirst(a: DirectorTask, b: DirectorTask): number {
   return Number(b.id) - Number(a.id)
 }
 
+function initialsForClient(name: string, email: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase().slice(0, 2)
+  }
+  if (parts.length === 1 && parts[0].length >= 2) {
+    return parts[0].slice(0, 2).toUpperCase()
+  }
+  const local = email.split("@")[0] ?? "?"
+  return local.slice(0, 2).toUpperCase()
+}
+
+function isCreatedToday(iso: string): boolean {
+  const d = new Date(iso)
+  const now = new Date()
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  )
+}
+
+const summaryCardClass =
+  "flex items-center justify-between gap-4 rounded-xl border border-violet-500/25 bg-zinc-950/90 px-5 py-4 shadow-[0_8px_32px_rgba(0,0,0,0.45)]"
+
+const summaryIconBoxClass =
+  "flex size-12 shrink-0 items-center justify-center rounded-xl border border-violet-500/35 bg-violet-500/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
+
+/** Panel de listas: mismo lenguaje oscuro que las tarjetas naranjas, sin marco blanco */
+const listPanelClass =
+  "rounded-xl border border-zinc-800/80 bg-zinc-950/90 text-zinc-100 min-h-[280px] flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.35)]"
+
+/** ~5 filas visibles; el resto con scroll (pendientes / completadas: filas altas) */
+const pendingScrollAreaClass =
+  "min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] max-h-[min(31rem,55vh)]"
+
+/** ~5 filas visibles; tarjetas de cliente más compactas */
+const clientsScrollAreaClass =
+  "min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] max-h-[min(17.5rem,40vh)]"
+
 export function TasksQueue() {
   const [tasks, setTasks] = useState<DirectorTask[]>([])
   const [loading, setLoading] = useState(true)
+  const { users } = useRegisteredUsers()
+
+  const usersEnteredToday = useMemo(
+    () => users.filter(u => isCreatedToday(u.createdAt)),
+    [users]
+  )
 
   const fetchTasks = useCallback(async () => {
     try {
@@ -86,9 +133,7 @@ export function TasksQueue() {
     const newCompleted = !task.completed
     setTasks(prev =>
       prev.map(t =>
-        t.id === taskId
-          ? { ...t, completed: newCompleted, isNew: false }
-          : t
+        t.id === taskId ? { ...t, completed: newCompleted, isNew: false } : t
       )
     )
     try {
@@ -105,9 +150,7 @@ export function TasksQueue() {
     }
   }
 
-  const [completedPage, setCompletedPage] = useState(0)
   const [clearing, setClearing] = useState(false)
-  const COMPLETED_PAGE_SIZE = 5
 
   const clearCompleted = async () => {
     setClearing(true)
@@ -115,29 +158,34 @@ export function TasksQueue() {
       const res = await apiFetch("/activation-tasks/completed", { method: "DELETE" })
       if (res.ok) {
         setTasks(prev => prev.filter(t => !t.completed))
-        setCompletedPage(0)
       }
-    } catch { /* ignore */ } finally {
+    } catch {
+      /* ignore */
+    } finally {
       setClearing(false)
     }
   }
 
-  const newTasksCount = tasks.filter(t => t.isNew).length
   const pendingTasks = tasks.filter(t => !t.completed)
-  const completedTasks = tasks.filter(t => t.completed)
-  const totalCompletedPages = Math.max(1, Math.ceil(completedTasks.length / COMPLETED_PAGE_SIZE))
-  const paginatedCompleted = completedTasks.slice(
-    completedPage * COMPLETED_PAGE_SIZE,
-    (completedPage + 1) * COMPLETED_PAGE_SIZE
-  )
 
-  const cardShell = (
-    children: ReactNode,
-    title: string,
-    headerAction?: ReactNode
-  ) => (
+  /** Un renglón por cliente con tareas pendientes: "Nombre (N)" */
+  const clientsPendingSummary = useMemo(() => {
+    const map = new Map<string, { name: string; count: number }>()
+    for (const t of pendingTasks) {
+      const cur = map.get(t.clientEmail)
+      if (cur) cur.count += 1
+      else map.set(t.clientEmail, { name: t.clientName, count: 1 })
+    }
+    return Array.from(map.entries())
+      .map(([email, v]) => ({ email, ...v }))
+      .sort((a, b) => a.name.localeCompare(b.name, "es", { sensitivity: "base" }))
+  }, [pendingTasks])
+
+  const completedTasks = tasks.filter(t => t.completed)
+
+  const cardShell = (children: ReactNode, title: string, headerAction?: ReactNode) => (
     <div className="relative w-full">
-      <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 blur-2xl opacity-50" />
+      <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/25 via-fuchsia-500/25 to-purple-500/25 blur-2xl opacity-40" />
       <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
         <CardHeader className="pb-2 border-b border-zinc-800 px-6 md:px-8">
           <div className="flex items-center justify-between gap-3">
@@ -147,84 +195,145 @@ export function TasksQueue() {
             {headerAction}
           </div>
         </CardHeader>
-        <CardContent className="pt-4 px-6 md:px-8 pb-6 text-white">
-          {children}
-        </CardContent>
+        <CardContent className="pt-4 px-6 md:px-8 pb-6 text-white">{children}</CardContent>
       </Card>
     </div>
   )
 
   if (loading) {
     return (
-      <div className="w-full max-w-4xl mx-auto flex items-center justify-center py-12">
-        <p className="text-zinc-500">Cargando tareas...</p>
+      <div className="w-full max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 animate-pulse">
+          <div className="h-24 rounded-xl bg-zinc-800/60" />
+          <div className="h-24 rounded-xl bg-zinc-800/60" />
+          <div className="h-80 rounded-2xl bg-zinc-800/40 xl:col-span-1" />
+          <div className="h-80 rounded-2xl bg-zinc-800/40 xl:col-span-1" />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8">
-      {/* Título + badge en línea con estilo oscuro */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold text-white">
-          Tareas de activación
-        </h1>
-        {newTasksCount > 0 && (
-          <Badge
-            className="h-8 px-4 text-sm rounded-full border border-purple-500/50 bg-zinc-900 text-purple-200 hover:bg-zinc-800"
-          >
-            {newTasksCount} nueva{newTasksCount > 1 ? "s" : ""}
-          </Badge>
-        )}
-      </div>
+    <div className="w-full max-w-6xl mx-auto space-y-8">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:gap-8">
+        {/* Columna: tareas pendientes */}
+        <div className="flex flex-col gap-4">
+          <div className={summaryCardClass}>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+                Tareas pendientes
+              </p>
+              <p className="mt-1 bg-gradient-to-br from-violet-300 to-fuchsia-300 bg-clip-text text-4xl font-semibold tabular-nums text-transparent">
+                {pendingTasks.length}
+              </p>
+            </div>
+            <div className={summaryIconBoxClass}>
+              <ClipboardList className="size-7 text-violet-400" strokeWidth={1.75} aria-hidden />
+            </div>
+          </div>
 
-      {cardShell(
-        <div className="flex flex-col divide-y divide-zinc-800">
-          {pendingTasks.map(task => (
-            <div
-              key={task.id}
-              className="flex items-start gap-4 py-4 first:pt-0"
-            >
-              <Checkbox
-                id={task.id}
-                checked={task.completed}
-                onCheckedChange={() => toggleTask(task.id)}
-                className="mt-1 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
-              />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-medium text-white">
-                    {task.clientName}
-                  </span>
-                  {task.isNew && (
-                    <span className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                  )}
-                </div>
-                <p className="text-sm text-zinc-200 mb-1">{task.description}</p>
-                {task.requestedNextPhase && (
-                  <p className="text-xs font-medium text-amber-200/90 mb-1">
-                    Al marcar como hecha, el alumno pasa a: «{task.requestedNextPhase}»
+          <div className={`${listPanelClass} overflow-hidden`}>
+              <div
+                className={`flex flex-col divide-y divide-zinc-800/80 ${pendingScrollAreaClass}`}
+              >
+                {pendingTasks.map(task => (
+                  <div key={task.id} className="flex items-start gap-4 px-4 py-4 first:pt-4">
+                    <Checkbox
+                      id={task.id}
+                      checked={task.completed}
+                      onCheckedChange={() => toggleTask(task.id)}
+                      className="mt-1 border-zinc-500 data-[state=checked]:bg-purple-600 data-[state=checked]:border-purple-600"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="font-medium text-white">{task.clientName}</span>
+                        {task.isNew && (
+                          <span className="size-2 shrink-0 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                        )}
+                      </div>
+                      <p className="mb-1 text-sm text-zinc-300">{task.description}</p>
+                      {task.requestedNextPhase && (
+                        <p className="mb-1 text-xs font-medium text-amber-200/90">
+                          Al marcar como hecha, el alumno pasa a: «{task.requestedNextPhase}»
+                        </p>
+                      )}
+                      <p className="text-xs text-zinc-500">{task.clientEmail}</p>
+                    </div>
+                  </div>
+                ))}
+                {pendingTasks.length === 0 && (
+                  <p className="py-12 text-center text-sm text-zinc-500">
+                    No hay tareas pendientes
                   </p>
                 )}
-                <p className="text-xs text-zinc-500">{task.clientEmail}</p>
               </div>
+          </div>
+        </div>
+
+        {/* Columna: ingresaron hoy + panel (misma caja que la columna de tareas) */}
+        <div className="flex flex-col gap-4">
+          <div className={summaryCardClass}>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-500">
+                Ingresaron hoy
+              </p>
+              <p className="mt-1 bg-gradient-to-br from-violet-300 to-fuchsia-300 bg-clip-text text-4xl font-semibold tabular-nums text-transparent">
+                {usersEnteredToday.length}
+              </p>
             </div>
-          ))}
-          {pendingTasks.length === 0 && (
-            <p className="py-4 text-sm text-zinc-500 text-center">
-              No hay tareas pendientes
-            </p>
-          )}
-        </div>,
-        `Pendientes (${pendingTasks.length})`
-      )}
+            <div className={summaryIconBoxClass}>
+              <Calendar className="size-7 text-violet-400" strokeWidth={1.75} aria-hidden />
+            </div>
+          </div>
+
+          <div className={`${listPanelClass} overflow-hidden`}>
+            <div className={`space-y-2 p-3 ${clientsScrollAreaClass}`}>
+              {clientsPendingSummary.map(c => (
+                <div
+                  key={c.email}
+                  className="flex items-center gap-3 rounded-xl border border-zinc-800/90 bg-black/35 px-3 py-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[border-color,background-color] duration-150 hover:border-violet-500/30 hover:bg-zinc-900/60"
+                >
+                  <div
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white shadow-md"
+                    style={{
+                      background:
+                        "linear-gradient(145deg, rgba(124, 58, 237, 0.95), rgba(192, 132, 252, 0.75))",
+                    }}
+                  >
+                    {initialsForClient(c.name, c.email)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium leading-tight text-zinc-100">
+                      {c.name}
+                    </p>
+                    <p className="truncate text-[11px] text-zinc-500">{c.email}</p>
+                  </div>
+                  <span
+                    className="flex h-8 min-w-[2.25rem] shrink-0 items-center justify-center rounded-full border border-violet-500/35 bg-violet-500/[0.12] px-2 text-sm font-semibold tabular-nums text-violet-200 shadow-[0_0_12px_-4px_rgba(139,92,246,0.5)]"
+                    title="Notificaciones pendientes"
+                  >
+                    {c.count}
+                  </span>
+                </div>
+              ))}
+              {clientsPendingSummary.length === 0 && (
+                <p className="py-12 text-center text-sm text-zinc-500">
+                  Sin notificaciones pendientes por cliente.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {completedTasks.length > 0 && (
         <div className="mt-2">
           {cardShell(
             <div className="flex flex-col">
-              <div className="flex flex-col divide-y divide-zinc-800">
-                {paginatedCompleted.map(task => (
+              <div
+                className={`flex flex-col divide-y divide-zinc-800 ${pendingScrollAreaClass}`}
+              >
+                {completedTasks.map(task => (
                   <div
                     key={task.id}
                     className="flex items-start gap-4 py-4 first:pt-0 opacity-70"
@@ -235,51 +344,38 @@ export function TasksQueue() {
                       onCheckedChange={() => toggleTask(task.id)}
                       className="mt-1 border-zinc-500 data-[state=checked]:bg-zinc-600 data-[state=checked]:border-zinc-600"
                     />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2">
                         <span className="font-medium text-zinc-400 line-through">
                           {task.clientName}
                         </span>
                       </div>
-                      <p className="text-sm text-zinc-500 line-through mb-1">
-                        {task.description}
-                      </p>
+                      <p className="mb-1 line-through text-sm text-zinc-500">{task.description}</p>
                       <p className="text-xs text-zinc-600">{task.clientEmail}</p>
                     </div>
                   </div>
                 ))}
               </div>
-
-              {totalCompletedPages > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-4 border-t border-zinc-800 mt-2">
-                  <button
-                    onClick={() => setCompletedPage(p => Math.max(0, p - 1))}
-                    disabled={completedPage === 0}
-                    className="px-3 py-1 text-xs rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Anterior
-                  </button>
-                  <span className="text-xs text-zinc-500">
-                    {completedPage + 1} / {totalCompletedPages}
-                  </span>
-                  <button
-                    onClick={() => setCompletedPage(p => Math.min(totalCompletedPages - 1, p + 1))}
-                    disabled={completedPage >= totalCompletedPages - 1}
-                    className="px-3 py-1 text-xs rounded border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Siguiente
-                  </button>
-                </div>
-              )}
             </div>,
             `Completadas (${completedTasks.length})`,
             <button
+              type="button"
               onClick={clearCompleted}
               disabled={clearing}
               title="Limpiar completadas"
-              className="p-1.5 rounded-md text-zinc-500 hover:text-red-400 hover:bg-zinc-800 disabled:opacity-40 transition-colors"
+              className="rounded-md p-1.5 text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-red-400 disabled:opacity-40"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M3 6h18" />
                 <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
@@ -290,7 +386,6 @@ export function TasksQueue() {
           )}
         </div>
       )}
-
     </div>
   )
 }

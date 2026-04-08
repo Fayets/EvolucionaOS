@@ -211,13 +211,13 @@ export function LoginForm() {
 
       <div className="relative z-10 flex min-h-dvh flex-col items-center justify-center px-4 py-10 sm:py-14">
         <div className="animate-login-enter flex w-full max-w-[420px] flex-col items-center">
-          <div className="mb-1 flex justify-center">
+          <div className="relative mb-1 mx-auto h-[120px] w-[min(100%,280px)] sm:h-[140px]">
             <Image
               src="/EvolucionaLogoLogin.png"
               alt="Evoluciona"
-              width={140}
-              height={140}
-              className="h-[120px] w-auto object-contain brightness-0 invert sm:h-[140px]"
+              fill
+              sizes="280px"
+              className="object-contain object-center brightness-0 invert"
               priority
             />
           </div>

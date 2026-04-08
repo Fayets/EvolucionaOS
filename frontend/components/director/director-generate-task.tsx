@@ -13,6 +13,14 @@ interface ClientItem {
   name: string
 }
 
+/** Lista de alumnos para el desplegable: se reutiliza entre aperturas del diálogo (evita lag). */
+let clientsListCache: ClientItem[] | null = null
+
+/** Llamar tras registrar un usuario nuevo para que el siguiente «Tarea a usuario» traiga la lista actualizada. */
+export function invalidateDirectorGenerateClientsCache() {
+  clientsListCache = null
+}
+
 interface ParticularTaskItem {
   id: number
   phase: string
@@ -21,7 +29,12 @@ interface ParticularTaskItem {
   completed: boolean
 }
 
-export function DirectorGenerateTask() {
+type DirectorGenerateTaskProps = {
+  /** Contenido apilado sin título de página ni ancho máximo del layout */
+  embedded?: boolean
+}
+
+export function DirectorGenerateTask({ embedded }: DirectorGenerateTaskProps = {}) {
   const [clients, setClients] = useState<ClientItem[]>([])
   const [selectedEmail, setSelectedEmail] = useState<string>("")
   const [selectedPhase, setSelectedPhase] = useState<string>(CLIENT_PHASES[0])
@@ -34,12 +47,31 @@ export function DirectorGenerateTask() {
   const [particularSuccess, setParticularSuccess] = useState(false)
 
   const fetchClients = useCallback(async () => {
+    if (clientsListCache !== null) {
+      setClients(clientsListCache)
+      setLoadingClients(false)
+      try {
+        const res = await apiFetch("/users/clients")
+        if (res.ok) {
+          const data = await res.json()
+          const list = Array.isArray(data.clients) ? data.clients : []
+          clientsListCache = list
+          setClients(list)
+        }
+      } catch {
+        /* mantener cache */
+      }
+      return
+    }
+
     setLoadingClients(true)
     try {
       const res = await apiFetch("/users/clients")
       if (res.ok) {
         const data = await res.json()
-        setClients(Array.isArray(data.clients) ? data.clients : [])
+        const list = Array.isArray(data.clients) ? data.clients : []
+        clientsListCache = list
+        setClients(list)
       } else {
         setClients([])
       }
@@ -51,7 +83,11 @@ export function DirectorGenerateTask() {
   }, [])
 
   useEffect(() => {
-    fetchClients()
+    // Deja que el diálogo pinte overlay + marco antes del fetch (menos sensación de “traba”).
+    const id = requestAnimationFrame(() => {
+      void fetchClients()
+    })
+    return () => cancelAnimationFrame(id)
   }, [fetchClients])
 
   const fetchParticularTasks = useCallback(async () => {
@@ -110,11 +146,9 @@ export function DirectorGenerateTask() {
 
   const selectedClient = clients.find((c) => c.email === selectedEmail)
 
-  return (
-    <div className="w-full max-w-2xl mx-auto">
-      <h1 className="text-2xl font-semibold text-white mb-8">Generar tarea</h1>
-
-      <div className="relative w-full mb-8">
+  const body = (
+    <>
+      <div className={`relative w-full ${embedded ? "mb-4" : "mb-8"}`}>
         <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 blur-2xl opacity-50" />
         <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
           <CardHeader className="pb-2 border-b border-zinc-800 px-6 md:px-8">
@@ -162,7 +196,7 @@ export function DirectorGenerateTask() {
 
       {selectedEmail && (
         <>
-          <div className="relative w-full mb-8">
+          <div className={`relative w-full ${embedded ? "mb-0" : "mb-8"}`}>
             <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 blur-2xl opacity-50" />
             <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
               <CardHeader className="pb-2 border-b border-zinc-800 px-6 md:px-8">
@@ -237,6 +271,17 @@ export function DirectorGenerateTask() {
 
         </>
       )}
+    </>
+  )
+
+  if (embedded) {
+    return <div className="w-full space-y-4 text-white">{body}</div>
+  }
+
+  return (
+    <div className="w-full max-w-2xl mx-auto">
+      <h1 className="text-2xl font-semibold text-white mb-8">Generar tarea</h1>
+      {body}
     </div>
   )
 }

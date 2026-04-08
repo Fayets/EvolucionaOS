@@ -1,6 +1,7 @@
 "use client"
 
 import { useApp } from "@/lib/app-context"
+import { useClientNotificationsSSE } from "@/lib/use-client-notifications-sse"
 import { CLIENT_PHASES } from "@/lib/phases"
 import { InitialDataForm } from "./initial-data-form"
 import { PlatformsAccess } from "./platforms-access"
@@ -9,7 +10,8 @@ import { OnboardingForm } from "./onboarding-form"
 import { ClientDoneView } from "./client-done-view"
 
 export function ClientView() {
-  const { clientPhase } = useApp()
+  const { clientPhase, userEmail } = useApp()
+  useClientNotificationsSSE(userEmail.trim() ? userEmail : null)
 
   if (clientPhase === "initial") return <InitialDataForm />
   if (clientPhase === "platforms") return <PlatformsAccess />

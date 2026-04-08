@@ -16,6 +16,8 @@ export type RegisteredUser = {
   id: string
   username: string
   createdAt: string
+  /** Fase del cliente en BD; null si no hay ficha Client */
+  clientPhase: string | null
 }
 
 const STORAGE_KEY = "evoluciona_registered_users"
@@ -25,8 +27,25 @@ function loadFromStorage(): RegisteredUser[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return []
-    const parsed = JSON.parse(raw) as RegisteredUser[]
-    return Array.isArray(parsed) ? parsed : []
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((x): x is Record<string, unknown> => x != null && typeof x === "object")
+      .map(x => {
+        const username = typeof x.username === "string" ? x.username : ""
+        if (!username) return null
+        return {
+          id: String(x.id ?? username),
+          username,
+          createdAt:
+            typeof x.createdAt === "string" ? x.createdAt : new Date().toISOString(),
+          clientPhase:
+            typeof x.clientPhase === "string" && x.clientPhase.trim() !== ""
+              ? x.clientPhase
+              : null,
+        } satisfies RegisteredUser
+      })
+      .filter((x): x is RegisteredUser => x !== null)
   } catch {
     return []
   }
@@ -45,6 +64,7 @@ type ApiUserRow = {
   id?: number | string
   email?: string
   created_at?: string | null
+  client_phase?: string | null
 }
 
 function mapApiUsersToRegistered(rows: unknown[]): RegisteredUser[] {
@@ -59,7 +79,11 @@ function mapApiUsersToRegistered(rows: unknown[]): RegisteredUser[] {
         u.created_at != null && u.created_at !== ""
           ? new Date(u.created_at as string).toISOString()
           : new Date().toISOString()
-      return { id, username: email, createdAt }
+      const clientPhase =
+        typeof u.client_phase === "string" && u.client_phase.trim() !== ""
+          ? u.client_phase
+          : null
+      return { id, username: email, createdAt, clientPhase }
     })
     .filter((x): x is RegisteredUser => x !== null)
 }

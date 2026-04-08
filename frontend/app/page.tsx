@@ -1,7 +1,6 @@
 "use client"
 
 import { AppProvider, useApp } from "@/lib/app-context"
-import { AppNotifications } from "@/components/app-notifications"
 import { LoginForm } from "@/components/login-form"
 import { ClientView } from "@/components/client/client-view"
 import { DirectorView } from "@/components/director/director-view"
@@ -57,7 +56,6 @@ function AppContent() {
     <div className="relative min-h-screen" style={{ background: "#060606" }}>
       <DashboardAtmosphere />
       <div className="relative z-10">
-        <AppNotifications />
         {userRole === "director" ? <DirectorView /> : <ClientView />}
       </div>
     </div>

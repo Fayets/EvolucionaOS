@@ -10,7 +10,13 @@ import { apiUrl } from "@/lib/api"
 
 type RoleOption = "SISTEMAS" | "MARKETING" | "VENTAS" | "DELIVERY" | "CLIENTE"
 
-export function RegisterUserForm() {
+type RegisterUserFormProps = {
+  /** Sin tarjeta ni glow; para usar dentro de un diálogo */
+  embedded?: boolean
+  onRegistered?: () => void
+}
+
+export function RegisterUserForm({ embedded, onRegistered }: RegisterUserFormProps = {}) {
   const { registerUser } = useRegisteredUsers()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -61,6 +67,7 @@ export function RegisterUserForm() {
       setFirstName("")
       setLastName("")
       setRole("CLIENTE")
+      onRegistered?.()
     } catch {
       setMessage({
         type: "err",
@@ -71,16 +78,7 @@ export function RegisterUserForm() {
     }
   }
 
-  return (
-    <div className="relative w-full max-w-lg mx-auto">
-      <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 blur-2xl opacity-50" />
-      <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
-        <CardHeader className="border-b border-zinc-800 px-6 md:px-8 pb-3">
-          <p className="inline-flex max-w-fit rounded bg-zinc-100 px-3 py-1 text-sm font-semibold text-black">
-            Registrar usuario
-          </p>
-        </CardHeader>
-        <CardContent className="px-6 md:px-8 py-7">
+  const form = (
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
               <Label htmlFor="reg-firstname" className="text-sm text-zinc-300">
@@ -190,7 +188,22 @@ export function RegisterUserForm() {
               {loading ? "Registrando..." : "Registrar"}
             </Button>
           </form>
-        </CardContent>
+  )
+
+  if (embedded) {
+    return <div className="w-full text-white">{form}</div>
+  }
+
+  return (
+    <div className="relative w-full max-w-lg mx-auto">
+      <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 blur-2xl opacity-50" />
+      <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
+        <CardHeader className="border-b border-zinc-800 px-6 md:px-8 pb-3">
+          <p className="inline-flex max-w-fit rounded bg-zinc-100 px-3 py-1 text-sm font-semibold text-black">
+            Registrar usuario
+          </p>
+        </CardHeader>
+        <CardContent className="px-6 md:px-8 py-7">{form}</CardContent>
       </Card>
     </div>
   )

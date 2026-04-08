@@ -4,9 +4,7 @@ import { useApp } from "@/lib/app-context"
 import {
   LayoutDashboard,
   LayoutGrid,
-  UserPlus,
   Users,
-  FilePlus,
   Settings,
   LogOut,
 } from "lucide-react"
@@ -14,9 +12,7 @@ import type { LucideIcon } from "lucide-react"
 
 export type DirectorViewId =
   | "tasks"
-  | "register"
   | "users"
-  | "generateTask"
   | "phases"
   | "settings"
 
@@ -27,9 +23,7 @@ type DirectorSidebarProps = {
 
 const navItems: { id: DirectorViewId; label: string; icon: LucideIcon }[] = [
   { id: "tasks", label: "Inicio", icon: LayoutDashboard },
-  { id: "register", label: "Registrar", icon: UserPlus },
   { id: "users", label: "Usuarios", icon: Users },
-  { id: "generateTask", label: "Nueva tarea", icon: FilePlus },
   { id: "phases", label: "Fases", icon: LayoutGrid },
 ]
 

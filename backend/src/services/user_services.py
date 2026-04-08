@@ -82,6 +82,11 @@ class UsersService:
                 # No usar to_dict(): incluye relaciones / tipos que rompen JSON o filtran password_hash.
                 users_conversion = []
                 for user in users:
+                    client_phase = None
+                    if user.role == Role.CLIENTE:
+                        client = models.Client.get(user=user)
+                        if client is not None:
+                            client_phase = client.phase
                     users_conversion.append(
                         {
                             "id": user.id,
@@ -91,6 +96,7 @@ class UsersService:
                             "last_name": user.last_name,
                             "created_at": user.created_at.isoformat() if user.created_at else None,
                             "updated_at": user.updated_at.isoformat() if user.updated_at else None,
+                            "client_phase": client_phase,
                         }
                     )
 
