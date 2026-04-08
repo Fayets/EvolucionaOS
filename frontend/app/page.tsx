@@ -1,19 +1,10 @@
 "use client"
 
-import dynamic from "next/dynamic"
 import { AppProvider, useApp } from "@/lib/app-context"
 import { AppNotifications } from "@/components/app-notifications"
 import { LoginForm } from "@/components/login-form"
-
-const ClientView = dynamic(
-  () => import("@/components/client/client-view").then((m) => ({ default: m.ClientView })),
-  { loading: () => null },
-)
-
-const DirectorView = dynamic(
-  () => import("@/components/director/director-view").then((m) => ({ default: m.DirectorView })),
-  { loading: () => null },
-)
+import { ClientView } from "@/components/client/client-view"
+import { DirectorView } from "@/components/director/director-view"
 
 function DashboardAtmosphere() {
   return (

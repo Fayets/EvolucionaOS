@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { jsPDF } from "jspdf"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -152,7 +153,6 @@ async function getLogoDataUrl(): Promise<string | null> {
 
 async function downloadOnboardingPdf(detail: UserDetail) {
   if (!detail.client?.onboarding_responses) return
-  const { jsPDF } = await import("jspdf")
   const doc = new jsPDF()
   let y = 26
   doc.setFillColor(7, 7, 10)

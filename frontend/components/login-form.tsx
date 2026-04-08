@@ -211,7 +211,7 @@ export function LoginForm() {
 
       <div className="relative z-10 flex min-h-dvh flex-col items-center justify-center px-4 py-10 sm:py-14">
         <div className="animate-login-enter flex w-full max-w-[420px] flex-col items-center">
-          <div className="mb-4 flex justify-center sm:mb-5">
+          <div className="mb-1 flex justify-center">
             <Image
               src="/EvolucionaLogoLogin.png"
               alt="Evoluciona"
@@ -231,7 +231,7 @@ export function LoginForm() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="tu@email.com"
+                  placeholder="nombre@ejemplo.com"
                   required
                   autoComplete="email"
                   aria-label="Email"
