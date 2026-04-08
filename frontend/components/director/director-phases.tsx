@@ -249,41 +249,45 @@ export function DirectorPhases() {
             ) : null}
           </div>
         </CardHeader>
-        <CardContent className="pt-4 px-4 md:px-5 pb-5 flex flex-col flex-1 gap-2">
-          {tasks.length === 0 ? (
-            <p className="text-xs text-zinc-600 py-2">Ninguna tarea aún.</p>
-          ) : (
-            <ul className="space-y-2 flex-1 min-h-[2rem] list-none p-0 m-0">
-              {tasks.map((task) => {
-                const hasClass = Boolean(task.link_url?.trim())
-                const extras = (task.deliverable_links ?? []).filter(Boolean).length
-                const hintParts: string[] = []
-                if (hasClass) hintParts.push("Clase")
-                if (extras > 0) hintParts.push(`${extras} entregable${extras === 1 ? "" : "s"}`)
-                const hint = hintParts.length > 0 ? hintParts.join(" · ") : "Solo nombre"
-                return (
-                  <li key={task.id}>
-                    <button
-                      type="button"
-                      onClick={() => setDialog({ kind: "edit", task })}
-                      className="w-full flex items-center justify-between gap-3 rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-3 text-left transition-colors hover:bg-zinc-800/80 hover:border-zinc-600"
-                    >
-                      <span className="text-sm text-zinc-100 leading-snug min-w-0 uppercase">
-                        {task.label}
-                        <span className="block text-[11px] text-zinc-500 font-normal mt-0.5 normal-case">
-                          {hint}
+        <CardContent className="flex flex-col gap-2 pt-4 px-4 pb-5 md:px-5">
+          <div
+            className="max-h-[min(50vh,22rem)] overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] rounded-md border border-zinc-800/60 bg-zinc-950/40 px-2 py-2 [scrollbar-width:thin] [scrollbar-color:rgb(63_63_70)_rgb(24_24_27)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-600 [&::-webkit-scrollbar-track]:rounded-md [&::-webkit-scrollbar-track]:bg-zinc-900/80"
+          >
+            {tasks.length === 0 ? (
+              <p className="text-xs text-zinc-600 py-2 px-1">Ninguna tarea aún.</p>
+            ) : (
+              <ul className="m-0 list-none space-y-2 p-0">
+                {tasks.map((task) => {
+                  const hasClass = Boolean(task.link_url?.trim())
+                  const extras = (task.deliverable_links ?? []).filter(Boolean).length
+                  const hintParts: string[] = []
+                  if (hasClass) hintParts.push("Clase")
+                  if (extras > 0) hintParts.push(`${extras} entregable${extras === 1 ? "" : "s"}`)
+                  const hint = hintParts.length > 0 ? hintParts.join(" · ") : "Solo nombre"
+                  return (
+                    <li key={task.id}>
+                      <button
+                        type="button"
+                        onClick={() => setDialog({ kind: "edit", task })}
+                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-zinc-700 bg-zinc-900/70 px-3 py-3 text-left transition-colors hover:border-zinc-600 hover:bg-zinc-800/80"
+                      >
+                        <span className="min-w-0 text-sm uppercase leading-snug text-zinc-100">
+                          {task.label}
+                          <span className="mt-0.5 block text-[11px] font-normal normal-case text-zinc-500">
+                            {hint}
+                          </span>
                         </span>
-                      </span>
-                      <ChevronRight className="size-4 text-zinc-500 shrink-0" aria-hidden />
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+                        <ChevronRight className="size-4 shrink-0 text-zinc-500" aria-hidden />
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
 
           {!allowAdd ? (
-            <p className="text-[11px] text-zinc-600 pt-2">
+            <p className="text-[11px] text-zinc-600 pt-1">
               Tareas con fase antigua en la base: abrí cada una para editar o eliminar.
             </p>
           ) : null}
@@ -302,11 +306,6 @@ export function DirectorPhases() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-1 md:px-2 pb-8">
-      <h1 className="text-2xl font-semibold text-white mb-2">Fases</h1>
-      <p className="text-sm text-zinc-500 mb-8">
-        Gestioná las tareas predeterminadas por fase del programa. Podés crear, editar y quitar desde cada ítem.
-      </p>
-
       {loading ? (
         <div className="w-full flex items-center justify-center py-16">
           <p className="text-zinc-500">Cargando fases y tareas...</p>

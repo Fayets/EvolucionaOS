@@ -6,8 +6,33 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { apiFetch } from "@/lib/api"
+import { cn } from "@/lib/utils"
 
 type DeployInfo = { commit_sha: string; commit_url: string | null }
+
+function cardShell(children: ReactNode, title: string) {
+  return (
+    <div className="relative w-full min-w-0">
+      <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-violet-500/25 via-fuchsia-500/20 to-violet-500/25 blur-2xl opacity-60" />
+      <Card
+        className={cn(
+          "relative w-full overflow-hidden rounded-2xl border border-violet-500/15 bg-gradient-to-br from-zinc-950 via-black to-zinc-950",
+          "text-white shadow-[0_0_48px_-12px_rgba(88,28,135,0.35)]"
+        )}
+      >
+        <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-violet-600/10 blur-3xl" />
+        <CardHeader className="relative border-b border-zinc-800/90 px-6 pb-3 pt-6 md:px-8">
+          <p className="inline-flex max-w-fit rounded-md border border-violet-500/40 bg-violet-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-violet-200">
+            {title}
+          </p>
+        </CardHeader>
+        <CardContent className="relative px-6 pb-8 pt-5 text-white md:px-8">
+          {children}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
 
 export function DirectorSettings() {
   const [discordLink, setDiscordLink] = useState("")
@@ -57,120 +82,93 @@ export function DirectorSettings() {
     }
   }
 
-  const cardShell = (children: ReactNode, title: string) => (
-    <div className="relative w-full">
-      <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 blur-2xl opacity-50" />
-      <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
-        <CardHeader className="pb-2 border-b border-zinc-800 px-6 md:px-8">
-          <p className="inline-flex max-w-fit rounded bg-zinc-100 px-3 py-1 text-sm font-semibold text-black">
-            {title}
-          </p>
-        </CardHeader>
-        <CardContent className="pt-4 px-6 md:px-8 pb-6 text-white">
-          {children}
-        </CardContent>
-      </Card>
-    </div>
-  )
-
-  if (loading) {
-    return (
-      <div className="w-full max-w-2xl mx-auto flex items-center justify-center py-12">
-        <p className="text-zinc-500">Cargando ajustes...</p>
-      </div>
-    )
-  }
-
   const shortSha = deployInfo?.commit_sha
     ? deployInfo.commit_sha.slice(0, 7)
     : null
 
-  return (
-    <div className="flex min-h-full w-full max-w-2xl mx-auto flex-col">
-      <h1 className="mb-8 shrink-0 text-2xl font-semibold text-white">Ajustes</h1>
+  if (loading) {
+    return (
+      <div className="mx-auto flex w-full max-w-6xl items-center justify-center py-20">
+        <p className="text-sm text-zinc-500">Cargando ajustes…</p>
+      </div>
+    )
+  }
 
-      <div className="shrink-0">
+  return (
+    <div className="mx-auto w-full max-w-6xl pb-12">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
         {cardShell(
-          <form onSubmit={handleSave} className="flex flex-col gap-4">
+          <form onSubmit={handleSave} className="flex flex-col gap-5">
             <div className="flex flex-col gap-2">
-              <Label htmlFor="discord-link" className="text-zinc-200">
+              <Label htmlFor="discord-link" className="text-sm text-zinc-300">
                 Link de Discord para clientes
               </Label>
               <Input
                 id="discord-link"
                 type="url"
                 value={discordLink}
-                onChange={(e) => setDiscordLink(e.target.value)}
+                onChange={e => setDiscordLink(e.target.value)}
                 placeholder="https://discord.gg/..."
-                className="h-11 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500"
+                className="h-11 border-zinc-700 bg-zinc-900/90 text-white placeholder:text-zinc-500 focus-visible:ring-violet-500/40"
               />
-              <p className="text-xs text-zinc-500">
-                Este enlace se mostrará cuando el cliente haga clic en &quot;Ingresar a
-                Discord&quot; en la vista de accesos a plataformas.
-              </p>
-              <p className="text-xs text-zinc-500">
-                Las tareas predeterminadas por fase se gestionan en el menú «Fases».
+              <p className="text-xs leading-relaxed text-zinc-500">
+                Este enlace se muestra cuando el cliente pulsa «Ingresar a Discord» en accesos a
+                plataformas.
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <Button
                 type="submit"
-                className="h-10 rounded-full border-0 bg-purple-600 px-6 text-white hover:bg-purple-700"
+                className="h-10 rounded-md border-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 text-white shadow-[0_0_20px_-8px_rgba(139,92,246,0.55)] hover:from-violet-500 hover:to-fuchsia-500"
               >
                 Guardar
               </Button>
-              {saved && (
+              {saved ? (
                 <span className="text-sm text-emerald-400">Guardado correctamente.</span>
-              )}
+              ) : null}
             </div>
           </form>,
           "Link de Discord"
         )}
-      </div>
 
-      <div className="min-h-8 flex-1" aria-hidden />
-
-      <div className="sticky bottom-0 shrink-0 pb-2 pt-6">
         {cardShell(
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             {deployLoadFailed ? (
               <p className="text-sm text-zinc-400">
-                No se pudo obtener la versión del API. Comprobá que el backend esté
-                actualizado.
+                No se pudo obtener la versión del API. Comprobá que el backend esté actualizado.
               </p>
             ) : deployInfo?.commit_sha ? (
               <>
-                <p className="text-sm text-zinc-300">
-                  Commit del <span className="text-zinc-100">backend</span> en este
-                  entorno:
+                <p className="text-sm text-zinc-400">
+                  Commit del <span className="text-zinc-200">backend</span> en este entorno:
                 </p>
-                <code className="break-all font-mono text-sm text-emerald-400">
-                  {deployInfo.commit_sha}
-                </code>
+                <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 px-4 py-3">
+                  <code className="break-all font-mono text-[13px] text-violet-300/95">
+                    {deployInfo.commit_sha}
+                  </code>
+                </div>
                 {deployInfo.commit_url ? (
                   <a
                     href={deployInfo.commit_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-fit text-sm text-purple-400 underline hover:text-purple-300"
+                    className="w-fit text-sm font-medium text-violet-300 underline-offset-4 hover:text-fuchsia-300 hover:underline"
                   >
                     Ver en GitHub ({shortSha})
                   </a>
                 ) : (
-                  <p className="text-xs text-zinc-500">
-                    Definí <span className="font-mono">GITHUB_REPOSITORY</span>{" "}
-                    (formato <span className="font-mono">owner/repo</span>) en el
-                    servidor para enlazar el commit.
+                  <p className="text-xs leading-relaxed text-zinc-500">
+                    Definí <span className="font-mono text-zinc-400">GITHUB_REPOSITORY</span>{" "}
+                    (<span className="font-mono">owner/repo</span>) en el servidor para enlazar el
+                    commit.
                   </p>
                 )}
               </>
             ) : (
-              <p className="text-sm text-zinc-400">
+              <p className="text-sm leading-relaxed text-zinc-400">
                 No hay SHA configurado. En el deploy, exportá{" "}
-                <span className="font-mono text-zinc-300">GIT_COMMIT_SHA</span>{" "}
-                (por ejemplo el valor de{" "}
-                <span className="font-mono text-zinc-300">GITHUB_SHA</span> en
-                GitHub Actions).
+                <span className="font-mono text-zinc-300">GIT_COMMIT_SHA</span> (por ejemplo{" "}
+                <span className="font-mono text-zinc-300">GITHUB_SHA</span> en GitHub Actions).
               </p>
             )}
           </div>,
