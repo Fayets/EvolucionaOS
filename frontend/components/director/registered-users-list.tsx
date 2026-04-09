@@ -356,7 +356,7 @@ export function RegisteredUsersList() {
       </Dialog>
 
       <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
-        <DialogContent className="max-h-[min(90vh,720px)] overflow-y-auto border-zinc-800 bg-zinc-950 text-white !duration-100 sm:max-w-2xl">
+        <DialogContent className="max-h-[min(90vh,720px)] w-[calc(100%-2rem)] overflow-y-auto border-zinc-800 bg-zinc-950 text-white !duration-100 sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white">Tarea a usuario</DialogTitle>
             <DialogDescription className="text-zinc-500">

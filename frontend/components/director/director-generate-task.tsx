@@ -146,131 +146,152 @@ export function DirectorGenerateTask({ embedded }: DirectorGenerateTaskProps = {
 
   const selectedClient = clients.find((c) => c.email === selectedEmail)
 
-  const body = (
+  const selectionFields = (
     <>
-      <div className={`relative w-full ${embedded ? "mb-4" : "mb-8"}`}>
-        <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 blur-2xl opacity-50" />
-        <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
-          <CardHeader className="pb-2 border-b border-zinc-800 px-6 md:px-8">
+      <div className="flex flex-col gap-2">
+        <Label className="text-zinc-200">Alumno</Label>
+        {loadingClients ? (
+          <p className="text-sm text-zinc-500">Cargando alumnos...</p>
+        ) : (
+          <select
+            value={selectedEmail}
+            onChange={(e) => setSelectedEmail(e.target.value)}
+            className="h-10 w-full max-w-md rounded-lg border border-zinc-600 bg-zinc-900 px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            <option value="">-- Elegir alumno --</option>
+            {clients.map((c) => (
+              <option key={c.email} value={c.email}>
+                {c.name || c.email} ({c.email})
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label className="text-zinc-200">Fase</Label>
+        <select
+          value={selectedPhase}
+          onChange={(e) => setSelectedPhase(e.target.value)}
+          className="h-10 w-full max-w-md rounded-lg border border-zinc-600 bg-zinc-900 px-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+        >
+          {CLIENT_PHASES.map((p) => (
+            <option key={p} value={p}>
+              {p}
+            </option>
+          ))}
+        </select>
+      </div>
+    </>
+  )
+
+  const createFormBlock = (
+    <>
+      <form onSubmit={handleCreateParticular} className="space-y-4">
+        <div className="flex flex-col gap-2">
+          <Label className="text-zinc-200">Título de la tarea</Label>
+          <Input
+            value={particularLabel}
+            onChange={(e) => setParticularLabel(e.target.value.toUpperCase())}
+            placeholder="EJ: REVISAR DOCUMENTO DE AVANCE"
+            autoCapitalize="characters"
+            className="h-10 border-zinc-600 bg-zinc-900 uppercase text-white"
+            required
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label className="text-zinc-200">Enlace (opcional)</Label>
+          <Input
+            value={particularLink}
+            onChange={(e) => setParticularLink(e.target.value)}
+            placeholder="https://..."
+            type="url"
+            className="h-10 border-zinc-600 bg-zinc-900 text-white"
+          />
+        </div>
+        <p className="text-xs text-zinc-500">
+          La tarea se agregará a la fase &quot;{selectedPhase}&quot; para este alumno.
+        </p>
+        <div className="flex flex-wrap items-center gap-3">
+          <Button
+            type="submit"
+            className="h-10 rounded-full border-0 bg-purple-600 px-5 text-white hover:bg-purple-700"
+            disabled={particularSubmitting}
+          >
+            {particularSubmitting ? "Creando…" : "Crear tarea particular"}
+          </Button>
+          {particularSuccess ? (
+            <span className="text-sm text-emerald-400">Tarea creada.</span>
+          ) : null}
+        </div>
+      </form>
+      {particularTasks.length > 0 ? (
+        <div className="mt-6 border-t border-zinc-800 pt-4">
+          <p className="mb-2 text-xs text-zinc-400">Tareas particulares ya creadas en esta fase:</p>
+          <ul className="space-y-1 text-sm text-zinc-300">
+            {particularTasks.map((t) => (
+              <li key={t.id} className="uppercase">
+                {t.label}
+                {t.link_url ? (
+                  <a
+                    href={t.link_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-2 text-xs text-purple-300 underline"
+                  >
+                    Ver enlace
+                  </a>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </>
+  )
+
+  const body = embedded ? (
+    <>
+      <div className="space-y-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+          Seleccionar alumno y fase
+        </p>
+        <div className="space-y-4">{selectionFields}</div>
+      </div>
+      {selectedEmail ? (
+        <div className="mt-6 space-y-4 border-t border-zinc-800 pt-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+            Crear tarea particular para {selectedClient?.name || selectedEmail}
+          </p>
+          <div className="space-y-4">{createFormBlock}</div>
+        </div>
+      ) : null}
+    </>
+  ) : (
+    <>
+      <div className="relative mb-8 w-full">
+        <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 opacity-50 blur-2xl" />
+        <Card className="relative w-full rounded-2xl border border-zinc-800 bg-black/80 text-white shadow-[0_0_40px_rgba(0,0,0,0.9)]">
+          <CardHeader className="border-b border-zinc-800 px-6 pb-2 md:px-8">
             <p className="inline-flex max-w-fit rounded bg-zinc-100 px-3 py-1 text-sm font-semibold text-black">
               Seleccionar alumno y fase
             </p>
           </CardHeader>
-          <CardContent className="pt-4 px-6 md:px-8 pb-6 space-y-4">
-            <div className="flex flex-col gap-2">
-              <Label className="text-zinc-200">Alumno</Label>
-              {loadingClients ? (
-                <p className="text-sm text-zinc-500">Cargando alumnos...</p>
-              ) : (
-                <select
-                  value={selectedEmail}
-                  onChange={(e) => setSelectedEmail(e.target.value)}
-                  className="h-10 w-full max-w-md rounded-lg border border-zinc-600 bg-zinc-900 text-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">-- Elegir alumno --</option>
-                  {clients.map((c) => (
-                    <option key={c.email} value={c.email}>
-                      {c.name || c.email} ({c.email})
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label className="text-zinc-200">Fase</Label>
-              <select
-                value={selectedPhase}
-                onChange={(e) => setSelectedPhase(e.target.value)}
-                className="h-10 w-full max-w-md rounded-lg border border-zinc-600 bg-zinc-900 text-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-              >
-                {CLIENT_PHASES.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </CardContent>
+          <CardContent className="space-y-4 px-6 pb-6 pt-4 md:px-8">{selectionFields}</CardContent>
         </Card>
       </div>
-
-      {selectedEmail && (
-        <>
-          <div className={`relative w-full ${embedded ? "mb-0" : "mb-8"}`}>
-            <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 blur-2xl opacity-50" />
-            <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
-              <CardHeader className="pb-2 border-b border-zinc-800 px-6 md:px-8">
-                <p className="inline-flex max-w-fit rounded bg-zinc-100 px-3 py-1 text-sm font-semibold text-black">
-                  Crear tarea particular para {selectedClient?.name || selectedEmail}
-                </p>
-              </CardHeader>
-              <CardContent className="pt-4 px-6 md:px-8 pb-6">
-                <form onSubmit={handleCreateParticular} className="space-y-4">
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-zinc-200">Título de la tarea</Label>
-                    <Input
-                      value={particularLabel}
-                      onChange={(e) => setParticularLabel(e.target.value.toUpperCase())}
-                      placeholder="EJ: REVISAR DOCUMENTO DE AVANCE"
-                      autoCapitalize="characters"
-                      className="h-10 bg-zinc-900 border-zinc-600 text-white uppercase"
-                      required
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-zinc-200">Enlace (opcional)</Label>
-                    <Input
-                      value={particularLink}
-                      onChange={(e) => setParticularLink(e.target.value)}
-                      placeholder="https://..."
-                      type="url"
-                      className="h-10 bg-zinc-900 border-zinc-600 text-white"
-                    />
-                  </div>
-                  <p className="text-xs text-zinc-500">
-                    La tarea se agregará a la fase &quot;{selectedPhase}&quot; para este alumno.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="submit"
-                      className="h-10 px-5 bg-purple-600 hover:bg-purple-700 text-white rounded-full border-0"
-                      disabled={particularSubmitting}
-                    >
-                      {particularSubmitting ? "Creando…" : "Crear tarea particular"}
-                    </Button>
-                    {particularSuccess && (
-                      <span className="text-sm text-emerald-400">Tarea creada.</span>
-                    )}
-                  </div>
-                </form>
-                {particularTasks.length > 0 && (
-                  <div className="mt-6 pt-4 border-t border-zinc-800">
-                    <p className="text-xs text-zinc-400 mb-2">Tareas particulares ya creadas en esta fase:</p>
-                    <ul className="space-y-1 text-sm text-zinc-300">
-                      {particularTasks.map((t) => (
-                        <li key={t.id} className="uppercase">
-                          {t.label}
-                          {t.link_url && (
-                            <a
-                              href={t.link_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="ml-2 text-purple-300 underline text-xs"
-                            >
-                              Ver enlace
-                            </a>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-        </>
-      )}
+      {selectedEmail ? (
+        <div className="relative mb-8 w-full">
+          <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/40 via-fuchsia-500/40 to-purple-500/40 opacity-50 blur-2xl" />
+          <Card className="relative w-full rounded-2xl border border-zinc-800 bg-black/80 text-white shadow-[0_0_40px_rgba(0,0,0,0.9)]">
+            <CardHeader className="border-b border-zinc-800 px-6 pb-2 md:px-8">
+              <p className="inline-flex max-w-fit rounded bg-zinc-100 px-3 py-1 text-sm font-semibold text-black">
+                Crear tarea particular para {selectedClient?.name || selectedEmail}
+              </p>
+            </CardHeader>
+            <CardContent className="px-6 pb-6 pt-4 md:px-8">{createFormBlock}</CardContent>
+          </Card>
+        </div>
+      ) : null}
     </>
   )
 
