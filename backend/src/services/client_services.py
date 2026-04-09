@@ -19,6 +19,66 @@ PROGRAM_PHASES = [
 PHASE_UNLOCKS_KEY_PREFIX = "phase_unlocks:"
 
 
+def _normalize_deliverable_entry(entry: dict) -> dict:
+    """Compatibilidad: transforma forma legacy a forma con history."""
+    label = str(entry.get("label") or "")
+    note = str(entry.get("note") or "")
+    link = str(entry.get("link") or "")
+    submitted_at = str(entry.get("submitted_at") or "")
+    director_note = str(entry.get("director_note") or "")
+    director_link = str(entry.get("director_link") or "")
+    corrected_at = str(entry.get("corrected_at") or "")
+
+    history_raw = entry.get("history")
+    history: list[dict] = []
+    if isinstance(history_raw, list):
+        for item in history_raw:
+            if not isinstance(item, dict):
+                continue
+            history.append(
+                {
+                    "note": str(item.get("note") or ""),
+                    "link": str(item.get("link") or ""),
+                    "submitted_at": str(item.get("submitted_at") or ""),
+                    "director_note": str(item.get("director_note") or "") or None,
+                    "director_link": str(item.get("director_link") or "") or None,
+                    "corrected_at": str(item.get("corrected_at") or "") or None,
+                }
+            )
+
+    if not history and (submitted_at or note or link):
+        history = [
+            {
+                "note": note,
+                "link": link,
+                "submitted_at": submitted_at,
+                "director_note": director_note or None,
+                "director_link": director_link or None,
+                "corrected_at": corrected_at or None,
+            }
+        ]
+
+    latest = history[-1] if history else {
+        "note": note,
+        "link": link,
+        "submitted_at": submitted_at,
+        "director_note": director_note or None,
+        "director_link": director_link or None,
+        "corrected_at": corrected_at or None,
+    }
+
+    return {
+        "label": label,
+        "note": str(latest.get("note") or ""),
+        "link": str(latest.get("link") or ""),
+        "submitted_at": str(latest.get("submitted_at") or ""),
+        "director_note": str(latest.get("director_note") or "") or None,
+        "director_link": str(latest.get("director_link") or "") or None,
+        "corrected_at": str(latest.get("corrected_at") or "") or None,
+        "history": history,
+    }
+
+
 def _parse_json(s: str | None) -> dict | None:
     if not s or not s.strip():
         return None
@@ -140,7 +200,13 @@ class ClientService:
                     return {}
                 raw = getattr(client, "mandatory_task_deliverables", None)
                 data = _parse_json(raw)
-                return data if isinstance(data, dict) else {}
+                if not isinstance(data, dict):
+                    return {}
+                out: dict = {}
+                for slug, entry in data.items():
+                    if isinstance(slug, str) and isinstance(entry, dict):
+                        out[slug] = _normalize_deliverable_entry(entry)
+                return out
             except HTTPException:
                 raise
             except Exception:
@@ -180,12 +246,31 @@ class ClientService:
                 if not isinstance(existing, dict):
                     existing = {}
                 slug_key = task_slug.strip()
+                prev_entry = existing.get(slug_key)
+                if not isinstance(prev_entry, dict):
+                    prev_entry = {}
+                normalized = _normalize_deliverable_entry(prev_entry)
+                history = list(normalized.get("history") or [])
+                now_iso = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+                history.append(
+                    {
+                        "note": n,
+                        "link": u,
+                        "submitted_at": now_iso,
+                        "director_note": None,
+                        "director_link": None,
+                        "corrected_at": None,
+                    }
+                )
                 existing[slug_key] = {
                     "label": task_label.strip(),
                     "note": n,
                     "link": u,
-                    "submitted_at": datetime.utcnow().replace(microsecond=0).isoformat()
-                    + "Z",
+                    "submitted_at": now_iso,
+                    "director_note": None,
+                    "director_link": None,
+                    "corrected_at": None,
+                    "history": history,
                 }
                 client.mandatory_task_deliverables = json.dumps(
                     existing, ensure_ascii=False
@@ -230,12 +315,26 @@ class ClientService:
                         status_code=404,
                         detail="El alumno aún no envió un entregable para esta tarea",
                     )
-                merged = dict(entry)
-                merged["director_note"] = dn
-                merged["director_link"] = dl
-                merged["corrected_at"] = (
-                    datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-                )
+                merged = _normalize_deliverable_entry(entry)
+                history = list(merged.get("history") or [])
+                if not history:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="El alumno aún no envió un entregable para esta tarea",
+                    )
+                corrected_at = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+                latest = dict(history[-1])
+                latest["director_note"] = dn or None
+                latest["director_link"] = dl or None
+                latest["corrected_at"] = corrected_at
+                history[-1] = latest
+                merged["note"] = str(latest.get("note") or "")
+                merged["link"] = str(latest.get("link") or "")
+                merged["submitted_at"] = str(latest.get("submitted_at") or "")
+                merged["director_note"] = dn or None
+                merged["director_link"] = dl or None
+                merged["corrected_at"] = corrected_at
+                merged["history"] = history
                 existing[slug_key] = merged
                 client.mandatory_task_deliverables = json.dumps(
                     existing, ensure_ascii=False

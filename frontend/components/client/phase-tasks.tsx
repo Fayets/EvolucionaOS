@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { Trash2 } from "lucide-react"
+import { ClipboardList, ListChecks, Trash2 } from "lucide-react"
 import { useApp } from "@/lib/app-context"
 import { apiFetch } from "@/lib/api"
 import { getNextPhaseOrDone } from "@/lib/phases"
@@ -69,6 +69,18 @@ function parseDeliverablesMap(raw: unknown): Record<string, MandatoryDeliverable
         note: String(e.note ?? ""),
         link: String(e.link ?? ""),
         submitted_at: e.submitted_at,
+      }
+      if (Array.isArray(e.history)) {
+        row.history = e.history
+          .filter((h): h is Record<string, unknown> => !!h && typeof h === "object")
+          .map((h) => ({
+            note: String(h.note ?? ""),
+            link: String(h.link ?? ""),
+            submitted_at: String(h.submitted_at ?? ""),
+            director_note: typeof h.director_note === "string" ? h.director_note : undefined,
+            director_link: typeof h.director_link === "string" ? h.director_link : undefined,
+            corrected_at: typeof h.corrected_at === "string" ? h.corrected_at : undefined,
+          }))
       }
       if (typeof e.director_note === "string" && e.director_note)
         row.director_note = e.director_note
@@ -390,7 +402,7 @@ export function PhaseTasks({
           />
           <div className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-10">
             <div className="relative w-full max-w-xl">
-              <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/60 via-fuchsia-500/60 to-purple-500/60 blur-2xl opacity-60" />
+            <div className="pointer-events-none absolute -inset-[1px] rounded-2xl border border-violet-400/10" />
               <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
                 <CardContent className="pt-8 pb-8 px-8 text-center">
                   <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
@@ -560,8 +572,8 @@ export function PhaseTasks({
         />
         <div className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-10">
           <div className="relative w-full max-w-6xl">
-            <div className="pointer-events-none absolute -inset-[1px] rounded-2xl border border-violet-400/15 shadow-[0_0_30px_rgba(168,85,247,0.14)]" />
-            <Card className="relative w-full rounded-2xl border border-zinc-800/90 bg-black/75 text-white shadow-[0_12px_42px_rgba(0,0,0,0.55)] backdrop-blur-sm">
+            <div className="pointer-events-none absolute -inset-[1px] rounded-2xl border border-violet-400/10" />
+            <Card className="relative w-full rounded-2xl border border-zinc-800/90 bg-black/85 text-white shadow-[0_8px_24px_rgba(0,0,0,0.35)]">
               <CardHeader className="pb-3 border-b border-zinc-800 px-6 md:px-10 flex items-center">
                 <div className="flex w-full items-center justify-between gap-3">
                   {onBack && forcePhaseView ? (
@@ -590,26 +602,26 @@ export function PhaseTasks({
                           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                             Tareas obligatorias
                           </p>
-                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 [contain:layout_paint_style]">
                             {tasks.map(task => (
                               <div
                                 key={`m-${task.id}`}
                                 onClick={() => setTaskModal({ kind: "mandatory", taskId: task.id })}
-                                className="group flex h-full min-h-[220px] cursor-pointer flex-col overflow-hidden rounded-2xl border border-zinc-700/90 bg-zinc-900/75 shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-colors hover:border-violet-500/50"
+                                className="group flex h-full min-h-[190px] cursor-pointer flex-col rounded-2xl border border-zinc-700/90 bg-zinc-900/80 shadow-[0_4px_12px_rgba(0,0,0,0.2)] [contain:paint]"
+                                style={{ contentVisibility: "auto", containIntrinsicSize: "190px" }}
                               >
-                                <div className="relative h-20 border-b border-zinc-800 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.12),transparent_50%),linear-gradient(to_right,rgba(30,27,75,0.45),rgba(9,9,11,0.7))]">
-                                  <div className="absolute left-3 top-3 inline-flex rounded-full border border-zinc-600 bg-black/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-200">
+                                <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-3">
+                                  <div className="inline-flex items-center gap-2 rounded-full border border-zinc-600 bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-200">
+                                    <ClipboardList className="size-3.5 text-violet-300" />
                                     Obligatoria
                                   </div>
-                                  <div className="absolute right-3 top-3">
-                                    <Checkbox
-                                      id={`task-${task.slug}`}
-                                      checked={completedSlugs.has(task.slug)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onCheckedChange={() => toggleMandatoryTask(task.slug)}
-                                      className="size-5 shrink-0 border-zinc-500 data-[state=checked]:border-purple-500 data-[state=checked]:bg-purple-500"
-                                    />
-                                  </div>
+                                  <Checkbox
+                                    id={`task-${task.slug}`}
+                                    checked={completedSlugs.has(task.slug)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onCheckedChange={() => toggleMandatoryTask(task.slug)}
+                                    className="size-5 shrink-0 border-zinc-500 data-[state=checked]:border-purple-500 data-[state=checked]:bg-purple-500"
+                                  />
                                 </div>
                                 <div className="flex flex-1 flex-col justify-between p-4">
                                   <div className="min-w-0">
@@ -618,7 +630,7 @@ export function PhaseTasks({
                                       Toca para ver links, entregables y correcciones.
                                     </p>
                                   </div>
-                                  <p className="mt-4 text-[11px] font-medium text-zinc-500 transition-colors group-hover:text-zinc-300">
+                                  <p className="mt-4 text-[11px] font-medium text-zinc-500">
                                     Ver detalle
                                   </p>
                                 </div>
@@ -632,26 +644,26 @@ export function PhaseTasks({
                           <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
                             Tareas particulares
                           </p>
-                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3 [contain:layout_paint_style]">
                             {particularTasks.map(task => (
                               <div
                                 key={`p-${task.id}`}
                                 onClick={() => setTaskModal({ kind: "particular", taskId: task.id })}
-                                className="group flex min-h-[220px] cursor-pointer flex-col overflow-hidden rounded-2xl border border-zinc-700/90 bg-zinc-900/75 shadow-[0_10px_30px_rgba(0,0,0,0.3)] transition-colors hover:border-violet-500/50"
+                                className="group flex min-h-[190px] cursor-pointer flex-col rounded-2xl border border-zinc-700/90 bg-zinc-900/80 shadow-[0_4px_12px_rgba(0,0,0,0.2)] [contain:paint]"
+                                style={{ contentVisibility: "auto", containIntrinsicSize: "190px" }}
                               >
-                                <div className="relative h-20 border-b border-zinc-800 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.1),transparent_50%),linear-gradient(to_right,rgba(88,28,135,0.35),rgba(9,9,11,0.7))]">
-                                  <div className="absolute left-3 top-3 inline-flex rounded-full border border-zinc-600 bg-black/40 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-200">
+                                <div className="flex items-center justify-between border-b border-zinc-800 px-3 py-3">
+                                  <div className="inline-flex items-center gap-2 rounded-full border border-zinc-600 bg-zinc-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-200">
+                                    <ListChecks className="size-3.5 text-fuchsia-300" />
                                     Particular
                                   </div>
-                                  <div className="absolute right-3 top-3">
-                                    <Checkbox
-                                      id={`particular-${task.id}`}
-                                      checked={task.completed}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onCheckedChange={() => toggleParticularTask(task.id)}
-                                      className="w-5 h-5 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
-                                    />
-                                  </div>
+                                  <Checkbox
+                                    id={`particular-${task.id}`}
+                                    checked={task.completed}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onCheckedChange={() => toggleParticularTask(task.id)}
+                                    className="w-5 h-5 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                                  />
                                 </div>
                                 <div className="flex flex-1 flex-col justify-between p-4">
                                   <div className="flex flex-col items-start">
@@ -661,7 +673,7 @@ export function PhaseTasks({
                                     </Label>
                                     <p className="mt-1 text-xs text-zinc-400">Toca para ver detalle de la tarea.</p>
                                   </div>
-                                  <p className="mt-4 text-[11px] font-medium text-zinc-500 transition-colors group-hover:text-zinc-300">
+                                  <p className="mt-4 text-[11px] font-medium text-zinc-500">
                                     Ver detalle
                                   </p>
                                 </div>

@@ -144,7 +144,7 @@ export function OnboardingForm() {
           <ClientSidebar />
           <div className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-10">
             <div className="relative w-full max-w-xl">
-              <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/60 via-fuchsia-500/60 to-purple-500/60 blur-2xl opacity-60" />
+              <div className="pointer-events-none absolute -inset-[1px] rounded-2xl border border-violet-400/15 shadow-[0_0_24px_rgba(168,85,247,0.12)]" />
               <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
                 <CardContent className="pt-8 pb-8 px-8 text-center">
                   <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center mx-auto mb-4">
@@ -185,7 +185,7 @@ export function OnboardingForm() {
 
         <div className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-10">
           <div className="relative w-full max-w-2xl">
-            <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/60 via-fuchsia-500/60 to-purple-500/60 blur-2xl opacity-60" />
+            <div className="pointer-events-none absolute -inset-[1px] rounded-2xl border border-violet-400/15 shadow-[0_0_24px_rgba(168,85,247,0.12)]" />
 
             <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
               <CardHeader className="pb-3 border-b border-zinc-800 px-6 md:px-10 flex flex-row items-center justify-between gap-4">

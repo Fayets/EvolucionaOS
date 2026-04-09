@@ -24,7 +24,7 @@ export function ClientSidebar({
   return (
     <aside
       className="hidden md:flex flex-col w-56 min-h-0 px-3 py-6 relative"
-      style={{ background: "rgba(8, 7, 12, 0.7)", backdropFilter: "blur(12px)" }}
+      style={{ background: "rgba(8, 7, 12, 0.84)" }}
     >
       <div
         className="pointer-events-none absolute inset-0"

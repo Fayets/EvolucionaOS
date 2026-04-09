@@ -140,20 +140,19 @@ export function ClientPhasesView({ currentPhase, onOpenPhase, onGoToInicio }: Cl
                       canOpen
                         ? "border-zinc-700 bg-zinc-900/75"
                         : "border-zinc-800 bg-zinc-900/45 opacity-85"
-                    } ${canOpen ? "cursor-pointer transition-transform hover:-translate-y-0.5" : ""}`}
+                    } ${canOpen ? "cursor-pointer" : ""}`}
+                    style={{ contentVisibility: "auto", containIntrinsicSize: "320px" }}
                   >
-                    <div
-                      className="relative h-28 border-b border-zinc-800"
-                      style={{
-                        backgroundImage: `
-                          linear-gradient(to top, rgba(9,9,11,0.88), rgba(9,9,11,0.35)),
-                          radial-gradient(circle at 20% 20%, rgba(255,255,255,0.14), transparent 45%),
-                          url(${phaseImages[phase]})
-                        `,
-                        backgroundSize: "cover, cover, cover",
-                        backgroundPosition: "center, center, center",
-                      }}
-                    >
+                    <div className="relative h-28 border-b border-zinc-800 bg-zinc-950">
+                      <img
+                        src={phaseImages[phase]}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        aria-hidden
+                        className="absolute inset-0 h-full w-full object-cover opacity-65"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/85 to-zinc-950/35" />
                       <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-zinc-600 bg-black/40 px-2.5 py-1 text-[11px] uppercase tracking-wide text-zinc-200">
                         Fase {idx + 1}
                       </div>

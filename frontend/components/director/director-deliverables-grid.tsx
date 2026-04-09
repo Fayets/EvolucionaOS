@@ -27,6 +27,14 @@ export type DeliverableGridRow = {
   director_note?: string
   director_link?: string
   corrected_at?: string
+  history?: Array<{
+    note: string
+    link: string
+    submitted_at: string
+    director_note?: string
+    director_link?: string
+    corrected_at?: string
+  }>
 }
 
 function formatSubmittedShort(iso: string) {
@@ -142,6 +150,7 @@ export function DirectorDeliverablesGoogleGrid({
           return (
             <article
               key={slug}
+              onClick={() => onRequestCorrection(slug, row.label || slug)}
               className="group flex flex-col overflow-hidden rounded-xl border border-zinc-200 bg-white text-zinc-900 shadow-sm transition hover:border-violet-400 hover:shadow-md"
             >
               <div
@@ -170,6 +179,11 @@ export function DirectorDeliverablesGoogleGrid({
                     Corregido {formatSubmittedShort(row.corrected_at)}
                   </p>
                 ) : null}
+                {Array.isArray(row.history) && row.history.length > 1 ? (
+                  <p className="mt-1 text-[10px] text-zinc-500">
+                    {row.history.length} intercambios
+                  </p>
+                ) : null}
                 <div className="mt-3 flex items-center justify-between gap-1 border-t border-zinc-100 pt-2">
                   <div className="flex min-w-0 flex-1 items-center gap-1.5 text-[11px] text-zinc-500">
                     <FileText className="size-3.5 shrink-0" aria-hidden />
@@ -182,6 +196,7 @@ export function DirectorDeliverablesGoogleGrid({
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 shrink-0 text-zinc-600"
+                        onClick={(e) => e.stopPropagation()}
                       >
                         <MoreVertical className="size-4" />
                         <span className="sr-only">Acciones</span>

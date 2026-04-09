@@ -51,6 +51,18 @@ function parseDeliverablesMap(raw: unknown): Record<string, MandatoryDeliverable
         link: String(e.link ?? ""),
         submitted_at: e.submitted_at,
       }
+      if (Array.isArray(e.history)) {
+        row.history = e.history
+          .filter((h): h is Record<string, unknown> => !!h && typeof h === "object")
+          .map((h) => ({
+            note: String(h.note ?? ""),
+            link: String(h.link ?? ""),
+            submitted_at: String(h.submitted_at ?? ""),
+            director_note: typeof h.director_note === "string" ? h.director_note : undefined,
+            director_link: typeof h.director_link === "string" ? h.director_link : undefined,
+            corrected_at: typeof h.corrected_at === "string" ? h.corrected_at : undefined,
+          }))
+      }
       if (typeof e.director_note === "string" && e.director_note)
         row.director_note = e.director_note
       if (typeof e.director_link === "string" && e.director_link)
@@ -254,7 +266,7 @@ export function AccessTasks() {
 
           <div className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-10">
             <div className="relative w-full max-w-xl">
-              <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/60 via-fuchsia-500/60 to-purple-500/60 blur-2xl opacity-60" />
+              <div className="pointer-events-none absolute -inset-[1px] rounded-2xl border border-violet-400/15 shadow-[0_0_24px_rgba(168,85,247,0.12)]" />
 
               <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
                 <CardContent className="pt-8 pb-8 px-8 text-center">
@@ -303,7 +315,7 @@ export function AccessTasks() {
 
         <div className="flex-1 flex flex-col items-center justify-start px-4 pt-10 pb-10">
           <div className="relative w-full">
-            <div className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-purple-500/60 via-fuchsia-500/60 to-purple-500/60 blur-2xl opacity-60" />
+            <div className="pointer-events-none absolute -inset-[1px] rounded-2xl border border-violet-400/15 shadow-[0_0_24px_rgba(168,85,247,0.12)]" />
 
             <Card className="relative w-full border border-zinc-800 bg-black/80 text-white rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.9)]">
               <CardHeader className="pb-3 border-b border-zinc-800 px-6 md:px-10 flex items-center">

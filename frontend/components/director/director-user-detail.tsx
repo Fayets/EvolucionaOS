@@ -45,6 +45,14 @@ type MandatoryDeliverableRow = {
   director_note?: string
   director_link?: string
   corrected_at?: string
+  history?: Array<{
+    note: string
+    link: string
+    submitted_at: string
+    director_note?: string
+    director_link?: string
+    corrected_at?: string
+  }>
 }
 
 type UserDetail = {
@@ -692,7 +700,7 @@ export function DirectorUserDetailView({
           if (!open) setCorrectionFor(null)
         }}
       >
-        <DialogContent className="border-zinc-800 bg-zinc-950 text-white sm:max-w-md">
+        <DialogContent className="border-zinc-800 bg-zinc-950 text-white outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 sm:max-w-4xl">
           <DialogHeader>
             <DialogTitle>Corregir y reenviar al alumno</DialogTitle>
             <DialogDescription className="text-zinc-500 text-left">
@@ -704,41 +712,80 @@ export function DirectorUserDetailView({
               {correctionFor.label}
             </p>
           ) : null}
-          <div className="grid gap-3 py-1">
-            <div className="grid gap-1.5">
-              <Label htmlFor="corr-note-du" className="text-zinc-300 text-xs">
-                Comentario
-              </Label>
-              <Textarea
-                id="corr-note-du"
-                value={corrNote}
-                onChange={e => setCorrNote(e.target.value)}
-                rows={4}
-                className="resize-y bg-zinc-900 border-zinc-700 text-white text-sm"
-              />
+          <div className="grid gap-3 py-1 md:grid-cols-2 md:gap-4">
+            <div className="grid gap-3">
+              <div className="grid gap-1.5">
+                <Label htmlFor="corr-note-du" className="text-zinc-300 text-xs">
+                  Comentario
+                </Label>
+                <Textarea
+                  id="corr-note-du"
+                  value={corrNote}
+                  onChange={e => setCorrNote(e.target.value)}
+                  rows={8}
+                  className="resize-y bg-zinc-900 border-zinc-700 text-white text-sm"
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="corr-link-du" className="text-zinc-300 text-xs">
+                  Enlace (opcional)
+                </Label>
+                <Input
+                  id="corr-link-du"
+                  value={corrLink}
+                  onChange={e => setCorrLink(e.target.value)}
+                  className="h-10 bg-zinc-900 border-zinc-700 text-white"
+                />
+              </div>
+              {corrErr ? <p className="text-sm text-red-400">{corrErr}</p> : null}
             </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="corr-link-du" className="text-zinc-300 text-xs">
-                Enlace (opcional)
-              </Label>
-              <Input
-                id="corr-link-du"
-                value={corrLink}
-                onChange={e => setCorrLink(e.target.value)}
-                className="h-10 bg-zinc-900 border-zinc-700 text-white"
-              />
+            <div className="min-h-0 rounded-md border border-zinc-800 bg-zinc-900/55 p-2.5">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
+                Historial
+              </p>
+              {correctionFor && detail?.client?.mandatory_task_deliverables?.[correctionFor.slug]?.history?.length ? (
+                <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+                  {(detail.client.mandatory_task_deliverables[correctionFor.slug].history ?? []).map((h, i) => (
+                    <div key={`${h.submitted_at}-${i}`} className="rounded border border-zinc-700/70 bg-zinc-950/60 p-2">
+                      <p className="text-[10px] uppercase tracking-wide text-violet-300 mb-1">Alumno</p>
+                      {h.note ? <p className="text-xs text-zinc-200 whitespace-pre-wrap">{h.note}</p> : null}
+                      {h.link ? (
+                        <a
+                          href={h.link}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block text-xs text-violet-300 underline mt-1"
+                        >
+                          Ver entregable
+                        </a>
+                      ) : null}
+                      {h.director_note || h.director_link ? (
+                        <div className="mt-2 rounded border border-amber-500/35 bg-amber-500/10 p-1.5">
+                          <p className="text-[10px] uppercase tracking-wide text-amber-200 mb-0.5">Director</p>
+                          {h.director_note ? (
+                            <p className="text-xs text-amber-50/95 whitespace-pre-wrap">{h.director_note}</p>
+                          ) : null}
+                          {h.director_link ? (
+                            <a
+                              href={h.director_link}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block text-xs text-amber-200 underline mt-1"
+                            >
+                              Ver enlace
+                            </a>
+                          ) : null}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-500">Todavía no hay historial para esta tarea.</p>
+              )}
             </div>
-            {corrErr ? <p className="text-sm text-red-400">{corrErr}</p> : null}
           </div>
           <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-zinc-600 text-white"
-              onClick={() => setCorrectionFor(null)}
-            >
-              Cancelar
-            </Button>
             <Button
               type="button"
               disabled={corrSaving}
