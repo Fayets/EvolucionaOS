@@ -62,3 +62,36 @@ class NotificationService:
                 raise
             except Exception:
                 return []
+
+    def delete_notification_by_id_for_email(self, email: str, notification_id: int) -> bool:
+        with db_session:
+            try:
+                user = models.User.get(email=email)
+                if not user:
+                    return False
+                row = models.Notification.get(id=notification_id, user=user)
+                if not row:
+                    return False
+                row.delete()
+                return True
+            except HTTPException:
+                raise
+            except Exception:
+                return False
+
+    def clear_notifications_for_email(self, email: str) -> int:
+        with db_session:
+            try:
+                user = models.User.get(email=email)
+                if not user:
+                    return 0
+                rows = list(user.notifications)
+                count = 0
+                for n in rows:
+                    n.delete()
+                    count += 1
+                return count
+            except HTTPException:
+                raise
+            except Exception:
+                return 0

@@ -8,6 +8,15 @@ from src import models
 from src.models import Role
 
 logger = logging.getLogger(__name__)
+PROGRAM_PHASES = [
+    "Acceso",
+    "Onboarding",
+    "Base de Negocios",
+    "Marketing",
+    "Proceso de Ventas",
+    "Optimizar",
+]
+PHASE_UNLOCKS_KEY_PREFIX = "phase_unlocks:"
 
 
 def _parse_json(s: str | None) -> dict | None:
@@ -272,3 +281,59 @@ class ClientService:
                 raise
             except Exception:
                 raise HTTPException(status_code=500, detail="Error al obtener lista de clientes")
+
+    def get_manual_phase_unlocks(self, email: str) -> list[str]:
+        with db_session:
+            try:
+                key = f"{PHASE_UNLOCKS_KEY_PREFIX}{email.strip().lower()}"
+                row = models.AppSetting.get(key=key)
+                if not row or not (row.value or "").strip():
+                    return []
+                data = json.loads(row.value)
+                if not isinstance(data, list):
+                    return []
+                valid = {p for p in PROGRAM_PHASES}
+                out = [p for p in data if isinstance(p, str) and p in valid]
+                seen: set[str] = set()
+                ordered: list[str] = []
+                for p in out:
+                    if p in seen:
+                        continue
+                    seen.add(p)
+                    ordered.append(p)
+                return ordered
+            except HTTPException:
+                raise
+            except Exception:
+                return []
+
+    def set_manual_phase_unlocks(self, email: str, phases: list[str]) -> bool:
+        with db_session:
+            try:
+                user = models.User.get(email=email)
+                if not user:
+                    return False
+                client = models.Client.get(user=user)
+                if not client:
+                    return False
+                valid = {p for p in PROGRAM_PHASES}
+                clean = [p for p in phases if isinstance(p, str) and p in valid]
+                seen: set[str] = set()
+                deduped: list[str] = []
+                for p in clean:
+                    if p in seen:
+                        continue
+                    seen.add(p)
+                    deduped.append(p)
+                key = f"{PHASE_UNLOCKS_KEY_PREFIX}{email.strip().lower()}"
+                payload = json.dumps(deduped, ensure_ascii=False)
+                row = models.AppSetting.get(key=key)
+                if row:
+                    row.value = payload
+                else:
+                    models.AppSetting(key=key, value=payload)
+                return True
+            except HTTPException:
+                raise
+            except Exception:
+                return False

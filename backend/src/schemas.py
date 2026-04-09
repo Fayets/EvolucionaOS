@@ -155,6 +155,23 @@ class DiscordLinkUpdate(BaseModel):
     url: str
 
 
+class PhaseImagesResponse(BaseModel):
+    images: dict[str, str] = Field(default_factory=dict)
+
+
+class PhaseImagesUpdate(BaseModel):
+    images: dict[str, str] = Field(default_factory=dict)
+
+
+class PhaseUnlocksResponse(BaseModel):
+    phases: list[str] = Field(default_factory=list)
+
+
+class PhaseUnlocksUpdateRequest(BaseModel):
+    email: EmailStr
+    phases: list[str] = Field(default_factory=list)
+
+
 class DeployInfoResponse(BaseModel):
     """SHA del commit del backend en producción (inyectado por CI/hosting)."""
 

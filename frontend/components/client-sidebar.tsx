@@ -5,10 +5,20 @@ import { useApp } from "@/lib/app-context"
 import { LayoutDashboard, MessageSquarePlus, LogOut } from "lucide-react"
 
 type ClientSidebarProps = {
+  primaryNavLabel?: string
   secondNavLabel?: string
+  activeNav?: "primary" | "secondary"
+  onPrimaryNavClick?: () => void
+  onSecondNavClick?: () => void
 }
 
-export function ClientSidebar({ secondNavLabel = "Iniciar ticket" }: ClientSidebarProps) {
+export function ClientSidebar({
+  primaryNavLabel = "Inicio",
+  secondNavLabel = "Iniciar ticket",
+  activeNav = "primary",
+  onPrimaryNavClick,
+  onSecondNavClick,
+}: ClientSidebarProps) {
   const { logout } = useApp()
 
   return (
@@ -28,25 +38,49 @@ export function ClientSidebar({ secondNavLabel = "Iniciar ticket" }: ClientSideb
       <nav className="relative flex flex-col gap-0.5">
         <button
           type="button"
+          onClick={onPrimaryNavClick}
           className="relative flex items-center gap-3 w-full text-left text-[13.5px] font-medium rounded-lg px-3 py-2 outline-none cursor-pointer"
-          style={{ color: "#e0e0e0", background: "rgba(255, 255, 255, 0.05)" }}
-        >
-          <span
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-4 rounded-full"
-            style={{ background: "rgba(255, 255, 255, 0.3)" }}
-          />
-          <LayoutDashboard size={16} strokeWidth={2} className="shrink-0 ml-1" />
-          Inicio
-        </button>
-        <button
-          type="button"
-          className="flex items-center gap-3 w-full text-left text-[13.5px] rounded-lg px-3 py-2 outline-none transition-all duration-150 cursor-pointer"
-          style={{ color: "#666" }}
+          style={
+            activeNav === "primary"
+              ? { color: "#e0e0e0", background: "rgba(255, 255, 255, 0.05)" }
+              : { color: "#666", background: "transparent" }
+          }
           onMouseEnter={(e) => {
+            if (activeNav === "primary") return
             e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"
             e.currentTarget.style.color = "#aaa"
           }}
           onMouseLeave={(e) => {
+            if (activeNav === "primary") return
+            e.currentTarget.style.background = "transparent"
+            e.currentTarget.style.color = "#666"
+          }}
+        >
+          {activeNav === "primary" ? (
+            <span
+              className="absolute left-0 top-1/2 -translate-y-1/2 w-[2.5px] h-4 rounded-full"
+              style={{ background: "rgba(255, 255, 255, 0.3)" }}
+            />
+          ) : null}
+          <LayoutDashboard size={16} strokeWidth={2} className="shrink-0 ml-1" />
+          {primaryNavLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onSecondNavClick}
+          className="flex items-center gap-3 w-full text-left text-[13.5px] rounded-lg px-3 py-2 outline-none transition-all duration-150 cursor-pointer"
+          style={
+            activeNav === "secondary"
+              ? { color: "#e0e0e0", background: "rgba(255, 255, 255, 0.05)" }
+              : { color: "#666", background: "transparent" }
+          }
+          onMouseEnter={(e) => {
+            if (activeNav === "secondary") return
+            e.currentTarget.style.background = "rgba(255, 255, 255, 0.03)"
+            e.currentTarget.style.color = "#aaa"
+          }}
+          onMouseLeave={(e) => {
+            if (activeNav === "secondary") return
             e.currentTarget.style.background = "transparent"
             e.currentTarget.style.color = "#666"
           }}

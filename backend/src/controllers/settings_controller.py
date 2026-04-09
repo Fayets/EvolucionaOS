@@ -75,6 +75,17 @@ def get_deploy_info(_current_user=Depends(get_director_user)):
     return schemas.DeployInfoResponse(commit_sha=sha, commit_url=commit_url)
 
 
+@router.get("/phase-images", response_model=schemas.PhaseImagesResponse)
+def get_phase_images(current_user=Depends(get_current_user)):
+    try:
+        images = service.get_phase_images()
+        return schemas.PhaseImagesResponse(images=images)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener imagenes de fases")
+
+
 @router.put("/discord-link")
 def set_discord_link(
     payload: schemas.DiscordLinkUpdate,
@@ -87,3 +98,17 @@ def set_discord_link(
         return {"message": e.detail, "success": False}
     except Exception:
         return {"message": "Error inesperado al guardar link.", "success": False}
+
+
+@router.put("/phase-images")
+def set_phase_images(
+    payload: schemas.PhaseImagesUpdate,
+    current_user=Depends(get_director_user),
+):
+    try:
+        service.set_phase_images(payload.images)
+        return {"message": "Imagenes de fases actualizadas", "success": True}
+    except HTTPException as e:
+        return {"message": e.detail, "success": False}
+    except Exception:
+        return {"message": "Error inesperado al guardar imagenes.", "success": False}

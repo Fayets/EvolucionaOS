@@ -62,3 +62,20 @@ def set_particular_task_complete(
         return {"message": e.detail, "success": False}
     except Exception:
         return {"message": "Error inesperado al actualizar tarea.", "success": False}
+
+
+@router.delete("/{task_id}")
+def delete_particular_task(
+    task_id: int,
+    email: str = Query(..., description="Email del alumno"),
+    current_user=Depends(get_current_user),
+):
+    try:
+        ok = service.delete_task(email, task_id)
+        if not ok:
+            return {"message": "Tarea o alumno no encontrados", "success": False}
+        return {"message": "Notificacion eliminada correctamente", "success": True}
+    except HTTPException as e:
+        return {"message": e.detail, "success": False}
+    except Exception:
+        return {"message": "Error inesperado al eliminar notificacion.", "success": False}

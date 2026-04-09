@@ -9,6 +9,16 @@ import { apiFetch } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 type DeployInfo = { commit_sha: string; commit_url: string | null }
+type PhaseImagesMap = Record<string, string>
+
+const PHASE_IMAGE_FIELDS: Array<{ key: string; label: string; placeholder: string }> = [
+  { key: "Acceso", label: "Acceso", placeholder: "/phases/acceso.jpg" },
+  { key: "Onboarding", label: "Onboarding", placeholder: "/phases/onboarding.jpg" },
+  { key: "Base de Negocios", label: "Base de negocio", placeholder: "/phases/base-de-negocio.jpg" },
+  { key: "Marketing", label: "Marketing", placeholder: "/phases/marketing.jpg" },
+  { key: "Proceso de Ventas", label: "Proceso de ventas", placeholder: "/phases/proceso-de-ventas.jpg" },
+  { key: "Optimizar", label: "Optimizar", placeholder: "/phases/optimizar.jpg" },
+]
 
 function cardShell(children: ReactNode, title: string) {
   return (
@@ -38,15 +48,18 @@ export function DirectorSettings() {
   const [discordLink, setDiscordLink] = useState("")
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [phaseImages, setPhaseImages] = useState<PhaseImagesMap>({})
+  const [phaseSaved, setPhaseSaved] = useState(false)
   const [deployInfo, setDeployInfo] = useState<DeployInfo | null>(null)
   const [deployLoadFailed, setDeployLoadFailed] = useState(false)
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [discordRes, deployRes] = await Promise.all([
+        const [discordRes, deployRes, phaseImagesRes] = await Promise.all([
           apiFetch("/settings/discord-link"),
           apiFetch("/settings/deploy-info"),
+          apiFetch("/settings/phase-images"),
         ])
         if (discordRes.ok) {
           const data = await discordRes.json()
@@ -58,6 +71,10 @@ export function DirectorSettings() {
           setDeployLoadFailed(false)
         } else {
           setDeployLoadFailed(true)
+        }
+        if (phaseImagesRes.ok) {
+          const data = (await phaseImagesRes.json()) as { images?: PhaseImagesMap }
+          setPhaseImages(data.images ?? {})
         }
       } catch {
         setDeployLoadFailed(true)
@@ -77,6 +94,24 @@ export function DirectorSettings() {
         body: JSON.stringify({ url: discordLink.trim() || "" }),
       })
       if (res.ok) setSaved(true)
+    } catch {
+      // ignorar
+    }
+  }
+
+  const handleSavePhaseImages = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPhaseSaved(false)
+    try {
+      const payload: PhaseImagesMap = {}
+      for (const field of PHASE_IMAGE_FIELDS) {
+        payload[field.key] = phaseImages[field.key] ?? ""
+      }
+      const res = await apiFetch("/settings/phase-images", {
+        method: "PUT",
+        body: JSON.stringify({ images: payload }),
+      })
+      if (res.ok) setPhaseSaved(true)
     } catch {
       // ignorar
     }
@@ -129,6 +164,40 @@ export function DirectorSettings() {
             </div>
           </form>,
           "Link de Discord"
+        )}
+
+        {cardShell(
+          <form onSubmit={handleSavePhaseImages} className="flex flex-col gap-4">
+            {PHASE_IMAGE_FIELDS.map((field) => (
+              <div key={field.key} className="flex flex-col gap-2">
+                <Label htmlFor={`phase-image-${field.key}`} className="text-sm text-zinc-300">
+                  Imagen de {field.label}
+                </Label>
+                <Input
+                  id={`phase-image-${field.key}`}
+                  type="text"
+                  value={phaseImages[field.key] ?? ""}
+                  onChange={(e) =>
+                    setPhaseImages((prev) => ({ ...prev, [field.key]: e.target.value }))
+                  }
+                  placeholder={field.placeholder}
+                  className="h-11 border-zinc-700 bg-zinc-900/90 text-white placeholder:text-zinc-500 focus-visible:ring-violet-500/40"
+                />
+              </div>
+            ))}
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <Button
+                type="submit"
+                className="h-10 rounded-md border-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 text-white shadow-[0_0_20px_-8px_rgba(139,92,246,0.55)] hover:from-violet-500 hover:to-fuchsia-500"
+              >
+                Guardar imagenes
+              </Button>
+              {phaseSaved ? (
+                <span className="text-sm text-emerald-400">Guardado correctamente.</span>
+              ) : null}
+            </div>
+          </form>,
+          "Imagenes de fases"
         )}
 
         {cardShell(

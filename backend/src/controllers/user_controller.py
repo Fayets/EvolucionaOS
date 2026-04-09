@@ -109,6 +109,53 @@ def get_my_client_phase(current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Error al obtener la fase")
 
 
+@router.get("/me/phase-unlocks", response_model=schemas.PhaseUnlocksResponse)
+def get_my_phase_unlocks(current_user=Depends(get_current_user)):
+    if current_user.role != Role.CLIENTE:
+        raise HTTPException(status_code=403, detail="Solo para clientes")
+    try:
+        phases = client_service.get_manual_phase_unlocks(current_user.email)
+        return schemas.PhaseUnlocksResponse(phases=phases)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener desbloqueos de fases")
+
+
+@router.get("/phase-unlocks", response_model=schemas.PhaseUnlocksResponse)
+def get_phase_unlocks(
+    email: str = Query(..., description="Email del cliente"),
+    _staff=Depends(get_staff_user),
+):
+    try:
+        phases = client_service.get_manual_phase_unlocks(email)
+        return schemas.PhaseUnlocksResponse(phases=phases)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=500, detail="Error al obtener desbloqueos de fases")
+
+
+@router.put("/phase-unlocks")
+def set_phase_unlocks(
+    payload: schemas.PhaseUnlocksUpdateRequest,
+    request: Request,
+    _staff=Depends(get_staff_user),
+):
+    try:
+        ok = client_service.set_manual_phase_unlocks(str(payload.email), payload.phases)
+        if not ok:
+            return {"message": "Cliente no encontrado", "success": False}
+        em = str(payload.email).strip()
+        loop = request.app.state.loop
+        loop.call_soon_threadsafe(lambda e=em: broadcast_to_user(e, {"type": "new_notification"}))
+        return {"message": "Desbloqueos de fase actualizados", "success": True}
+    except HTTPException as e:
+        return {"message": e.detail, "success": False}
+    except Exception:
+        return {"message": "Error inesperado al actualizar desbloqueos.", "success": False}
+
+
 @router.post("/phase-advance-request")
 def request_phase_advance(
     payload: schemas.PhaseAdvanceRequest,

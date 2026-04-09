@@ -35,6 +35,7 @@ import {
 import { DirectorDeliverablesGoogleGrid } from "@/components/director/director-deliverables-grid"
 import { cn } from "@/lib/utils"
 import { DIRECTOR_TOOLBAR_BUTTON_CLASS } from "@/components/director/director-toolbar-styles"
+import { Checkbox } from "@/components/ui/checkbox"
 
 type MandatoryDeliverableRow = {
   label: string
@@ -98,6 +99,15 @@ const TIMELINE: { ids: string[]; short: string }[] = [
   { ids: ["Optimizar"], short: "OPTIMIZAR" },
   { ids: ["done"], short: "FIN" },
 ]
+
+const PROGRAM_PHASES = [
+  "Acceso",
+  "Onboarding",
+  "Base de Negocios",
+  "Marketing",
+  "Proceso de Ventas",
+  "Optimizar",
+] as const
 
 function timelineIndex(phase: string): number {
   const p = phase.trim()
@@ -263,7 +273,7 @@ function PhaseTimeline({ phase }: { phase: string }) {
   )
 }
 
-type TabId = "progreso" | "particulares" | "entregables"
+type TabId = "progreso" | "particulares" | "entregables" | "habilitar"
 
 export function DirectorUserDetailView({
   email,
@@ -287,6 +297,8 @@ export function DirectorUserDetailView({
   const [corrLink, setCorrLink] = useState("")
   const [corrSaving, setCorrSaving] = useState(false)
   const [corrErr, setCorrErr] = useState<string | null>(null)
+  const [manualPhaseUnlocks, setManualPhaseUnlocks] = useState<Set<string>>(new Set())
+  const [phaseUnlocksSaving, setPhaseUnlocksSaving] = useState(false)
 
   const fetchDetail = useCallback(async () => {
     setLoading(true)
@@ -318,6 +330,21 @@ export function DirectorUserDetailView({
   useEffect(() => {
     void fetchDetail()
   }, [fetchDetail])
+
+  const fetchPhaseUnlocks = useCallback(async () => {
+    try {
+      const res = await apiFetch(`/users/phase-unlocks?email=${encodeURIComponent(email)}`)
+      if (!res.ok) return
+      const data = (await res.json()) as { phases?: string[] }
+      setManualPhaseUnlocks(new Set(data.phases ?? []))
+    } catch {
+      // ignore
+    }
+  }, [email])
+
+  useEffect(() => {
+    void fetchPhaseUnlocks()
+  }, [fetchPhaseUnlocks])
 
   useEffect(() => {
     if (!correctionFor || !detail?.client?.mandatory_task_deliverables) {
@@ -419,6 +446,33 @@ export function DirectorUserDetailView({
   }
 
   const nextPhase = detail?.client ? getNextStoredPhase(detail.client.phase) : null
+  const currentProgramIdx = detail?.client
+    ? PROGRAM_PHASES.indexOf(normalizeStoredPhase(detail.client.phase) as (typeof PROGRAM_PHASES)[number])
+    : -1
+
+  const saveManualPhaseUnlocks = useCallback(
+    async (nextSet: Set<string>) => {
+      setPhaseUnlocksSaving(true)
+      const prev = manualPhaseUnlocks
+      setManualPhaseUnlocks(nextSet)
+      try {
+        const res = await apiFetch("/users/phase-unlocks", {
+          method: "PUT",
+          body: JSON.stringify({ email, phases: Array.from(nextSet) }),
+        })
+        const data = (await res.json().catch(() => ({}))) as { success?: boolean; message?: string }
+        if (!res.ok || data.success === false) {
+          throw new Error(data.message || "No se pudo actualizar desbloqueos")
+        }
+      } catch (err) {
+        setManualPhaseUnlocks(prev)
+        alert(err instanceof Error ? err.message : "No se pudo actualizar desbloqueos")
+      } finally {
+        setPhaseUnlocksSaving(false)
+      }
+    },
+    [email, manualPhaseUnlocks]
+  )
 
   return (
     <div className="w-full max-w-5xl mx-auto pb-12">
@@ -520,6 +574,7 @@ export function DirectorUserDetailView({
                     ["progreso", "Progreso"],
                     ["particulares", "Tareas particulares"],
                     ["entregables", "Entregables"],
+                    ["habilitar", "Habilitar fases"],
                   ] as const
                 ).map(([id, label]) => (
                   <button
@@ -578,6 +633,52 @@ export function DirectorUserDetailView({
                         : null
                     }
                   />
+                )}
+                {tab === "habilitar" && (
+                  <div className="rounded-xl border border-zinc-800/90 bg-zinc-950/60 p-4">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold text-zinc-200">Habilitar fases</h3>
+                      {phaseUnlocksSaving ? (
+                        <span className="text-xs text-zinc-500">Guardando...</span>
+                      ) : null}
+                    </div>
+                    <p className="mb-4 text-xs text-zinc-500">
+                      Las fases anteriores a la actual quedan habilitadas automaticamente. Usa los
+                      checkboxes para habilitar fases futuras en tiempo real.
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {PROGRAM_PHASES.map((phaseNameLabel, idx) => {
+                        const autoEnabled = currentProgramIdx >= idx && currentProgramIdx !== -1
+                        const checked = autoEnabled || manualPhaseUnlocks.has(phaseNameLabel)
+                        return (
+                          <label
+                            key={phaseNameLabel}
+                            className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900/60 px-3 py-2"
+                          >
+                            <Checkbox
+                              checked={checked}
+                              disabled={autoEnabled || phaseUnlocksSaving}
+                              onCheckedChange={(v) => {
+                                const next = new Set(manualPhaseUnlocks)
+                                if (v) next.add(phaseNameLabel)
+                                else next.delete(phaseNameLabel)
+                                void saveManualPhaseUnlocks(next)
+                              }}
+                              className="border-zinc-600 data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500"
+                            />
+                            <span
+                              className={cn(
+                                "text-sm",
+                                autoEnabled ? "text-zinc-400" : "text-zinc-200"
+                              )}
+                            >
+                              {phaseNameLabel}
+                            </span>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
                 )}
               </div>
             </>

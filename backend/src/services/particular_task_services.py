@@ -92,3 +92,22 @@ class ParticularTaskService:
                 raise
             except Exception:
                 return False
+
+    def delete_task(self, email: str, task_id: int) -> bool:
+        with db_session:
+            try:
+                user = models.User.get(email=email)
+                if not user:
+                    return False
+                client = models.Client.get(user=user)
+                if not client:
+                    return False
+                task = models.ClientParticularTask.get(id=task_id, client=client)
+                if not task:
+                    return False
+                task.delete()
+                return True
+            except HTTPException:
+                raise
+            except Exception:
+                return False
