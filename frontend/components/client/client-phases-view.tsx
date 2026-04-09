@@ -203,21 +203,21 @@ export function ClientPhasesView({ currentPhase, onOpenPhase, onGoToInicio }: Cl
                     } ${canOpen ? "cursor-pointer" : ""}`}
                     style={{ contentVisibility: "auto", containIntrinsicSize: "320px" }}
                   >
-                    <div className="relative h-28 border-b border-zinc-800 bg-zinc-950">
+                    <div className="relative h-28 border-b border-zinc-800 bg-zinc-900">
                       <img
                         src={phaseImages[phase]}
                         alt=""
                         loading="lazy"
                         decoding="async"
                         aria-hidden
-                        className="absolute inset-0 h-full w-full object-cover opacity-65"
+                        className="absolute inset-0 h-full w-full object-cover"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-950/85 to-zinc-950/35" />
-                      <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-zinc-600 bg-black/40 px-2.5 py-1 text-[11px] uppercase tracking-wide text-zinc-200">
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-transparent" />
+                      <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-black/30 px-2.5 py-1 text-[11px] uppercase tracking-wide text-white shadow-sm backdrop-blur-[2px]">
                         Fase {idx + 1}
                       </div>
                       {!canOpen ? (
-                        <div className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full border border-zinc-700 bg-black/60">
+                        <div className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full border border-white/15 bg-black/35 backdrop-blur-[2px]">
                           <Lock className="size-4 text-zinc-300" />
                         </div>
                       ) : null}
