@@ -145,6 +145,18 @@ class ParticularTaskCompleteRequest(BaseModel):
     completed: bool = True
 
 
+class ParticularDeliverableSubmitRequest(BaseModel):
+    email: EmailStr
+    note: str | None = None
+    link: str | None = None
+
+
+class ParticularDeliverableDirectorFeedbackRequest(BaseModel):
+    student_email: EmailStr
+    director_note: str | None = None
+    director_link: str | None = None
+
+
 # ─── Settings ────────────────────────────────────────────────────────
 
 class DiscordLinkResponse(BaseModel):

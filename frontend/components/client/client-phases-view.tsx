@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Lock, ChevronRight } from "lucide-react"
+import { useApp } from "@/lib/app-context"
 import { CLIENT_PHASES, type PhaseName } from "@/lib/phases"
 import { ClientLayoutLogo, ClientSidebar } from "@/components/client-sidebar"
 import { Button } from "@/components/ui/button"
@@ -52,10 +53,64 @@ interface ClientPhasesViewProps {
 }
 
 export function ClientPhasesView({ currentPhase, onOpenPhase, onGoToInicio }: ClientPhasesViewProps) {
+  const { userEmail } = useApp()
   const currentIdx = Math.max(CLIENT_PHASES.indexOf(currentPhase as PhaseName), 0)
   const currentPhaseName = CLIENT_PHASES[currentIdx] ?? CLIENT_PHASES[0]
   const [phaseImages, setPhaseImages] = useState<Record<PhaseName, string>>(PHASE_IMAGES)
   const [manualUnlocks, setManualUnlocks] = useState<Set<PhaseName>>(new Set())
+  /** Progreso de la fase actual: obligatorias + particulares (misma lógica que PhaseTasks). */
+  const [currentPhaseProgress, setCurrentPhaseProgress] = useState<number | null>(null)
+
+  const loadCurrentPhaseProgress = useCallback(async () => {
+    if (!userEmail?.trim()) {
+      setCurrentPhaseProgress(0)
+      return
+    }
+    const phase = currentPhaseName
+    try {
+      const [tRes, cRes, pRes] = await Promise.all([
+        apiFetch(`/mandatory-tasks?phase=${encodeURIComponent(phase)}`),
+        apiFetch(
+          `/mandatory-tasks-completion?email=${encodeURIComponent(userEmail)}&phase=${encodeURIComponent(phase)}`
+        ),
+        apiFetch(
+          `/particular-tasks/all?email=${encodeURIComponent(userEmail)}&phase=${encodeURIComponent(phase)}`
+        ),
+      ])
+      const rawTasks = tRes.ok ? await tRes.json() : []
+      const taskList = Array.isArray(rawTasks) ? rawTasks : []
+      const comp = cRes.ok ? await cRes.json() : {}
+      const completedSlugs = new Set(
+        Array.isArray(comp.completed_slugs) ? comp.completed_slugs : []
+      )
+      const rawParticular = pRes.ok ? await pRes.json() : {}
+      const particularList = Array.isArray(rawParticular.tasks) ? rawParticular.tasks : []
+
+      const mandatoryDone = taskList.filter(
+        (t: { slug?: string }) => t.slug && completedSlugs.has(t.slug)
+      ).length
+      const particularDone = particularList.filter(
+        (t: { completed?: boolean }) => t.completed
+      ).length
+      const total = taskList.length + particularList.length
+      const done = mandatoryDone + particularDone
+      const pct = total === 0 ? 100 : Math.round((done / total) * 100)
+      setCurrentPhaseProgress(pct)
+    } catch {
+      setCurrentPhaseProgress(0)
+    }
+  }, [userEmail, currentPhaseName])
+
+  useEffect(() => {
+    setCurrentPhaseProgress(null)
+    void loadCurrentPhaseProgress()
+  }, [loadCurrentPhaseProgress])
+
+  useEffect(() => {
+    const onChanged = () => void loadCurrentPhaseProgress()
+    window.addEventListener(CLIENT_NOTIFICATIONS_CHANGED, onChanged)
+    return () => window.removeEventListener(CLIENT_NOTIFICATIONS_CHANGED, onChanged)
+  }, [loadCurrentPhaseProgress])
 
   useEffect(() => {
     const loadPhaseImages = async () => {
@@ -128,7 +183,12 @@ export function ClientPhasesView({ currentPhase, onOpenPhase, onGoToInicio }: Cl
                 const canOpen = unlocked || manuallyUnlocked
                 const isCurrent = phase === currentPhase
                 const cardCopy = PHASE_COPY[phase]
-                const progress = idx < currentIdx ? 100 : isCurrent ? 35 : 0
+                const progress =
+                  idx < currentIdx
+                    ? 100
+                    : isCurrent
+                      ? (currentPhaseProgress ?? 0)
+                      : 0
 
                 return (
                   <Card

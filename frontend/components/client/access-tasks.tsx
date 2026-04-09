@@ -11,8 +11,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import {
   MandatoryTaskDeliverableBlock,
+  parseMandatoryDeliverableEntry,
   type MandatoryDeliverableEntry,
 } from "@/components/client/mandatory-task-deliverable-block"
+import { ParticularTaskDeliverableBlock } from "@/components/client/particular-task-deliverable-block"
 
 const PHASE_ACCESO = "Acceso"
 
@@ -32,6 +34,7 @@ interface ParticularTaskFromApi {
   label: string
   link_url: string
   completed: boolean
+  deliverable?: MandatoryDeliverableEntry
 }
 
 function parseDeliverablesMap(raw: unknown): Record<string, MandatoryDeliverableEntry> {
@@ -123,7 +126,17 @@ export function AccessTasks() {
       )
       if (res.ok) {
         const data = await res.json()
-        setParticularTasks(Array.isArray(data.tasks) ? data.tasks : [])
+        const rawList = Array.isArray(data.tasks) ? data.tasks : []
+        setParticularTasks(
+          rawList.map((t: Record<string, unknown>) => ({
+            id: Number(t.id),
+            phase: String(t.phase ?? ""),
+            label: String(t.label ?? ""),
+            link_url: String(t.link_url ?? ""),
+            completed: Boolean(t.completed),
+            deliverable: parseMandatoryDeliverableEntry(t.deliverable),
+          }))
+        )
       } else {
         setParticularTasks([])
       }
@@ -398,35 +411,45 @@ export function AccessTasks() {
                       {particularTasks.map(task => (
                         <div
                           key={`p-${task.id}`}
-                          className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 bg-zinc-900/70 px-4 py-3"
+                          className="flex flex-col gap-0 rounded-lg border border-zinc-700 bg-zinc-900/70 px-4 py-3"
                         >
-                          <div className="flex flex-col items-start">
-                            <Label
-                              htmlFor={`particular-${task.id}`}
-                              className="text-sm md:text-base cursor-pointer"
-                            >
-                              <span className="uppercase">{task.label}</span>
-                              <span className="ml-1.5 text-xs font-normal text-zinc-400 normal-case">(tarea para vos)</span>
-                            </Label>
-                            {task.link_url ? (
-                              <a
-                                href={task.link_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-xs text-purple-300 underline mt-1 text-left hover:text-purple-200"
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex flex-col items-start min-w-0">
+                              <Label
+                                htmlFor={`particular-${task.id}`}
+                                className="text-sm md:text-base cursor-pointer"
                               >
-                                Ver enlace
-                              </a>
-                            ) : (
-                              <span className="text-xs text-zinc-500 mt-1">Sin enlace</span>
-                            )}
+                                <span className="uppercase">{task.label}</span>
+                                <span className="ml-1.5 text-xs font-normal text-zinc-400 normal-case">(tarea para vos)</span>
+                              </Label>
+                              {task.link_url?.trim() ? (
+                                <a
+                                  href={task.link_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-purple-300 underline mt-1 text-left hover:text-purple-200"
+                                >
+                                  Ver enlace del director
+                                </a>
+                              ) : (
+                                <span className="text-xs text-zinc-500 mt-1">Sin enlace de referencia</span>
+                              )}
+                            </div>
+                            <Checkbox
+                              id={`particular-${task.id}`}
+                              checked={task.completed}
+                              onCheckedChange={() => toggleParticularTask(task.id)}
+                              className="w-5 h-5 shrink-0 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
+                            />
                           </div>
-                          <Checkbox
-                            id={`particular-${task.id}`}
-                            checked={task.completed}
-                            onCheckedChange={() => toggleParticularTask(task.id)}
-                            className="w-5 h-5 border-zinc-500 data-[state=checked]:bg-purple-500 data-[state=checked]:border-purple-500"
-                          />
+                          {userEmail ? (
+                            <ParticularTaskDeliverableBlock
+                              userEmail={userEmail}
+                              taskId={task.id}
+                              stored={task.deliverable}
+                              onSaved={() => void fetchParticularTasks()}
+                            />
+                          ) : null}
                         </div>
                       ))}
                     </div>

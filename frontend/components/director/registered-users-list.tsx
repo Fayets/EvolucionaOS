@@ -8,6 +8,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
@@ -125,13 +126,27 @@ export function RegisteredUsersList() {
   const [registerOpen, setRegisterOpen] = useState(false)
   const [taskOpen, setTaskOpen] = useState(false)
   const [viewEmail, setViewEmail] = useState<string | null>(null)
+  const [removeTarget, setRemoveTarget] = useState<{ id: string; username: string } | null>(
+    null
+  )
+  const [removeLoading, setRemoveLoading] = useState(false)
 
-  const handleQuitar = async (user: { id: string; username: string }) => {
+  const confirmRemoveUser = async () => {
+    if (!removeTarget) return
+    setRemoveLoading(true)
     try {
-      await apiFetch(`/users/by-email?email=${encodeURIComponent(user.username)}`, { method: "DELETE" })
-    } catch {}
-    removeUser(user.id)
-    if (viewEmail === user.username) setViewEmail(null)
+      await apiFetch(
+        `/users/by-email?email=${encodeURIComponent(removeTarget.username)}`,
+        { method: "DELETE" }
+      )
+      removeUser(removeTarget.id)
+      if (viewEmail === removeTarget.username) setViewEmail(null)
+      setRemoveTarget(null)
+    } catch {
+      /* sin toast en director por ahora */
+    } finally {
+      setRemoveLoading(false)
+    }
   }
 
   const phaseFilterItems = useMemo(
@@ -304,7 +319,7 @@ export function RegisteredUsersList() {
                           variant="ghost"
                           size="sm"
                           className="text-zinc-400 hover:text-red-400 hover:bg-zinc-900"
-                          onClick={() => handleQuitar(user)}
+                          onClick={() => setRemoveTarget(user)}
                         >
                           Quitar
                         </Button>
@@ -364,6 +379,42 @@ export function RegisteredUsersList() {
             </DialogDescription>
           </DialogHeader>
           <DirectorGenerateTaskLazy embedded />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={!!removeTarget}
+        onOpenChange={(open) => {
+          if (!open && !removeLoading) setRemoveTarget(null)
+        }}
+      >
+        <DialogContent className="border-zinc-800 bg-zinc-950 text-white sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Quitar alumno</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              ¿Estás seguro de que deseas eliminar a{" "}
+              <span className="font-medium text-zinc-100">{removeTarget?.username}</span>?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-zinc-600 bg-zinc-900 text-white hover:bg-zinc-800"
+              disabled={removeLoading}
+              onClick={() => setRemoveTarget(null)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={removeLoading}
+              onClick={() => void confirmRemoveUser()}
+            >
+              {removeLoading ? "Eliminando…" : "Eliminar"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

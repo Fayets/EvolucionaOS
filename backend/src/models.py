@@ -95,6 +95,8 @@ class ClientParticularTask(db.Entity):
     phase = Required(str)
     label = Required(str)
     link_url = Optional(str)
+    # JSON: misma forma que una entrada de mandatory_task_deliverables (note, link, history, …)
+    deliverable_json = Optional(str)
     completed = Required(bool, default=False)
     completed_at = Optional(datetime)
     created_at = Required(datetime, default=datetime.utcnow)

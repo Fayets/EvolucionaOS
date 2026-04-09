@@ -154,17 +154,29 @@ class UsersService:
                 }
                 client = models.Client.get(user=user)
                 if client:
-                    from .client_services import _parse_json
+                    from .client_services import _normalize_deliverable_entry, _parse_json
 
                     md = _parse_json(getattr(client, "mandatory_task_deliverables", None))
                     if not isinstance(md, dict):
                         md = None
+                    particular_deliverables: dict = {}
+                    for t in list(client.particular_tasks):
+                        dj = getattr(t, "deliverable_json", None) or ""
+                        if not str(dj).strip():
+                            continue
+                        parsed = _parse_json(dj)
+                        if not isinstance(parsed, dict):
+                            continue
+                        particular_deliverables[str(t.id)] = _normalize_deliverable_entry(
+                            {**parsed, "label": t.label}
+                        )
                     out["client"] = {
                         "phase": client.phase,
                         "phone": client.phone,
                         "email": client.email,
                         "onboarding_responses": _parse_json(client.onboarding_responses),
                         "mandatory_task_deliverables": md,
+                        "particular_task_deliverables": particular_deliverables,
                     }
                 else:
                     out["client"] = None

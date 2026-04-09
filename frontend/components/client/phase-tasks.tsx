@@ -11,6 +11,15 @@ import {
   requestPhaseAdvance,
 } from "@/lib/phase-advance"
 import { CLIENT_NOTIFICATIONS_CHANGED } from "@/lib/use-client-notifications-sse"
+import {
+  dispatchNavigateToTask,
+  findMandatoryTaskByLabelAcrossPhases,
+  findParticularTaskByLabelAcrossPhases,
+  foldLabel,
+  parseCorreccionTitleQuotedLabel,
+  parseNuevaTareaLabelFromBody,
+  type ClientNavigateToTaskDetail,
+} from "@/lib/client-task-navigation"
 import { ClientLayoutLogo, ClientSidebar } from "@/components/client-sidebar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -19,8 +28,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label"
 import {
   MandatoryTaskDeliverableBlock,
+  parseMandatoryDeliverableEntry,
   type MandatoryDeliverableEntry,
 } from "@/components/client/mandatory-task-deliverable-block"
+import { ParticularTaskDeliverableBlock } from "@/components/client/particular-task-deliverable-block"
 
 interface TaskFromApi {
   id: number
@@ -38,6 +49,7 @@ interface ParticularTaskFromApi {
   label: string
   link_url: string
   completed: boolean
+  deliverable?: MandatoryDeliverableEntry
 }
 
 interface UserNotification {
@@ -99,13 +111,17 @@ export function PhaseTasks({
   onBack,
   onGoHome,
   forcePhaseView = false,
+  navigateToTaskRequest = null,
+  onNavigateToTaskConsumed,
 }: {
   phase: string
   onBack?: () => void
   onGoHome?: () => void
   forcePhaseView?: boolean
+  navigateToTaskRequest?: ClientNavigateToTaskDetail | null
+  onNavigateToTaskConsumed?: () => void
 }) {
-  const { userEmail, setClientPhase } = useApp()
+  const { userEmail, accessToken, setClientPhase } = useApp()
   const [tasks, setTasks] = useState<TaskFromApi[]>([])
   const [particularTasks, setParticularTasks] = useState<ParticularTaskFromApi[]>([])
   const [completedSlugs, setCompletedSlugs] = useState<Set<string>>(new Set())
@@ -118,6 +134,7 @@ export function PhaseTasks({
     Record<string, MandatoryDeliverableEntry>
   >({})
   const [taskModal, setTaskModal] = useState<TaskModalState>(null)
+  const [notificationNavigateBusyId, setNotificationNavigateBusyId] = useState<number | null>(null)
 
   const fetchDeliverables = useCallback(async () => {
     if (!userEmail) return
@@ -156,7 +173,17 @@ export function PhaseTasks({
       )
       if (res.ok) {
         const data = await res.json()
-        setParticularTasks(Array.isArray(data.tasks) ? data.tasks : [])
+        const rawList = Array.isArray(data.tasks) ? data.tasks : []
+        setParticularTasks(
+          rawList.map((t: Record<string, unknown>) => ({
+            id: Number(t.id),
+            phase: String(t.phase ?? ""),
+            label: String(t.label ?? ""),
+            link_url: String(t.link_url ?? ""),
+            completed: Boolean(t.completed),
+            deliverable: parseMandatoryDeliverableEntry(t.deliverable),
+          }))
+        )
       } else {
         setParticularTasks([])
       }
@@ -303,11 +330,114 @@ export function PhaseTasks({
     }
   }
 
+  const handleNotificationNavigate = async (n: UserNotification) => {
+    if (notificationNavigateBusyId != null || !userEmail) return
+    /** Inicio de cualquier fase (notificaciones + pendientes): pasar a vista “fase” con todas las tareas. */
+    const inicioSplitView = !forcePhaseView
+    const title = n.title?.normalize("NFC").trim() ?? ""
+    const body = n.body || ""
+
+    if (title === "Nueva tarea asignada") {
+      const label = parseNuevaTareaLabelFromBody(body)
+      if (!label) return
+      const local = particularTasks.find((t) => foldLabel(t.label) === foldLabel(label))
+      if (local) {
+        if (inicioSplitView) {
+          dispatchNavigateToTask({ phase, particularTaskId: local.id })
+        } else {
+          setTaskModal({ kind: "particular", taskId: local.id })
+        }
+        return
+      }
+      setNotificationNavigateBusyId(n.id)
+      try {
+        const found = await findParticularTaskByLabelAcrossPhases(userEmail, label, {
+          bearerToken: accessToken,
+        })
+        if (found) {
+          if (found.phase === phase) {
+            await fetchParticularTasks()
+            if (inicioSplitView) {
+              dispatchNavigateToTask({ phase: found.phase, particularTaskId: found.taskId })
+            } else {
+              setTaskModal({ kind: "particular", taskId: found.taskId })
+            }
+          } else {
+            dispatchNavigateToTask({ phase: found.phase, particularTaskId: found.taskId })
+          }
+        }
+      } finally {
+        setNotificationNavigateBusyId(null)
+      }
+      return
+    }
+
+    const correccionLabel = parseCorreccionTitleQuotedLabel(title)
+    if (correccionLabel) {
+      const local = tasks.find((t) => foldLabel(t.label) === foldLabel(correccionLabel))
+      if (local) {
+        if (inicioSplitView) {
+          dispatchNavigateToTask({ phase, mandatoryTaskId: local.id })
+        } else {
+          setTaskModal({ kind: "mandatory", taskId: local.id })
+        }
+        return
+      }
+      setNotificationNavigateBusyId(n.id)
+      try {
+        const found = await findMandatoryTaskByLabelAcrossPhases(correccionLabel, {
+          bearerToken: accessToken,
+        })
+        if (found) {
+          if (found.phase === phase) {
+            await fetchTasks()
+            if (inicioSplitView) {
+              dispatchNavigateToTask({ phase: found.phase, mandatoryTaskId: found.taskId })
+            } else {
+              setTaskModal({ kind: "mandatory", taskId: found.taskId })
+            }
+          } else {
+            dispatchNavigateToTask({ phase: found.phase, mandatoryTaskId: found.taskId })
+          }
+        }
+      } finally {
+        setNotificationNavigateBusyId(null)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (!navigateToTaskRequest || loading) return
+    if (navigateToTaskRequest.phase !== phase) return
+    const { particularTaskId, mandatoryTaskId } = navigateToTaskRequest
+    if (particularTaskId != null) {
+      if (particularTasks.some((t) => t.id === particularTaskId)) {
+        setTaskModal({ kind: "particular", taskId: particularTaskId })
+      }
+      onNavigateToTaskConsumed?.()
+      return
+    }
+    if (mandatoryTaskId != null) {
+      if (tasks.some((t) => t.id === mandatoryTaskId)) {
+        setTaskModal({ kind: "mandatory", taskId: mandatoryTaskId })
+      }
+      onNavigateToTaskConsumed?.()
+    }
+  }, [
+    navigateToTaskRequest,
+    loading,
+    phase,
+    particularTasks,
+    tasks,
+    onNavigateToTaskConsumed,
+  ])
+
   const allMandatoryCompleted = tasks.length === 0 || tasks.every(t => completedSlugs.has(t.slug))
   const allParticularCompleted = particularTasks.every(t => t.completed)
   const allTasksCompleted = allMandatoryCompleted && allParticularCompleted
   const hasAnyTasks = tasks.length > 0 || particularTasks.length > 0
-  const isAccessPhase = phase === "Acceso" && !forcePhaseView
+  /** Inicio del programa: notificaciones + pendientes (todas las fases, no solo Acceso). */
+  const isInicioSplitView = !forcePhaseView
   const accessMandatoryPending = tasks.filter((t) => !completedSlugs.has(t.slug))
   const accessParticularPending = particularTasks.filter((t) => !t.completed)
   const accessParticularCompleted = particularTasks.filter((t) => t.completed)
@@ -435,7 +565,7 @@ export function PhaseTasks({
     )
   }
 
-  if (isAccessPhase) {
+  if (isInicioSplitView) {
     return (
       <div className="min-h-screen bg-transparent text-white flex flex-col items-center">
         <ClientLayoutLogo />
@@ -470,35 +600,58 @@ export function PhaseTasks({
                       </p>
                     ) : (
                       <div className="divide-y divide-zinc-800/80">
-                        {accessNotifications.map((notification) => (
-                          <div key={notification.id} className="flex items-start justify-between gap-3 px-4 py-4">
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm text-white">{notification.label}</p>
-                              <p className="mt-1 text-xs text-zinc-500">
-                                {notification.body || "Notificacion del administrador"}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className={`rounded-full border px-2 py-0.5 text-[11px] ${
-                                  notification.state === "Pendiente"
-                                    ? "border-amber-500/35 bg-amber-500/10 text-amber-200"
-                                    : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
-                                }`}
-                              >
-                                {notification.state}
-                              </div>
+                        {accessNotifications.map((notification) => {
+                          const raw = notifications.find(
+                            (x) => Number(x.id) === Number(notification.notificationId)
+                          )
+                          const titleNorm = raw?.title?.normalize("NFC").trim() ?? ""
+                          const canDeepLink =
+                            !!raw &&
+                            ((titleNorm === "Nueva tarea asignada" &&
+                              parseNuevaTareaLabelFromBody(raw.body) != null) ||
+                              parseCorreccionTitleQuotedLabel(raw.title) != null)
+                          return (
+                            <div
+                              key={notification.id}
+                              className="flex items-start justify-between gap-3 px-4 py-4"
+                            >
                               <button
                                 type="button"
-                                onClick={() => void deleteNotification(notification.notificationId)}
-                                title="Eliminar notificacion"
-                                className="rounded-md border border-zinc-700 p-1.5 text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white"
+                                disabled={!canDeepLink || notificationNavigateBusyId != null}
+                                onClick={() => raw && void handleNotificationNavigate(raw)}
+                                className={`min-w-0 flex-1 rounded-lg px-0.5 py-0.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-violet-500/40 ${
+                                  canDeepLink
+                                    ? "cursor-pointer hover:bg-zinc-800/50 disabled:cursor-wait disabled:opacity-60"
+                                    : "cursor-default"
+                                }`}
                               >
-                                <Trash2 className="size-3.5" />
+                                <p className="text-sm text-white">{notification.label}</p>
+                                <p className="mt-1 text-xs text-zinc-500">
+                                  {notification.body || "Notificacion del administrador"}
+                                </p>
                               </button>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <div
+                                  className={`rounded-full border px-2 py-0.5 text-[11px] ${
+                                    notification.state === "Pendiente"
+                                      ? "border-amber-500/35 bg-amber-500/10 text-amber-200"
+                                      : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+                                  }`}
+                                >
+                                  {notification.state}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void deleteNotification(notification.notificationId)}
+                                  title="Eliminar notificacion"
+                                  className="rounded-md border border-zinc-700 p-1.5 text-zinc-300 transition-colors hover:border-zinc-500 hover:text-white"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     )}
                   </div>
@@ -688,28 +841,26 @@ export function PhaseTasks({
                   {advanceError && (
                     <p className="text-sm text-red-400">{advanceError}</p>
                   )}
-                  {!isAccessPhase ? (
-                    <div className="pt-4 max-w-sm">
-                      <Button
-                        onClick={handleFinishPhase}
-                        disabled={
-                          !nextPhase ||
-                          !hasAnyTasks ||
-                          !allTasksCompleted ||
-                          finishing
-                        }
-                        className="w-full h-11 bg-zinc-900 border border-zinc-600 text-white rounded-full hover:bg-zinc-800 hover:border-zinc-400 disabled:opacity-40 disabled:cursor-not-allowed"
-                      >
-                        {finishing
-                          ? "Enviando solicitud..."
-                          : nextPhase === "done"
-                            ? `Solicitar cierre del programa`
-                            : nextPhase
-                              ? `Solicitar paso a «${nextPhase}»`
-                              : "Solicitar avance"}
-                      </Button>
-                    </div>
-                  ) : null}
+                  <div className="pt-4 max-w-sm">
+                    <Button
+                      onClick={handleFinishPhase}
+                      disabled={
+                        !nextPhase ||
+                        !hasAnyTasks ||
+                        !allTasksCompleted ||
+                        finishing
+                      }
+                      className="w-full h-11 bg-zinc-900 border border-zinc-600 text-white rounded-full hover:bg-zinc-800 hover:border-zinc-400 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {finishing
+                        ? "Enviando solicitud..."
+                        : nextPhase === "done"
+                          ? `Solicitar cierre del programa`
+                          : nextPhase
+                            ? `Solicitar paso a «${nextPhase}»`
+                            : "Solicitar avance"}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -718,7 +869,7 @@ export function PhaseTasks({
       </div>
 
       <Dialog open={!!taskModal} onOpenChange={(open) => !open && setTaskModal(null)}>
-        <DialogContent className="max-h-[85vh] overflow-y-auto border-zinc-800 bg-zinc-950 text-white sm:max-w-2xl">
+        <DialogContent className="max-h-[85vh] overflow-y-auto border-zinc-800 bg-zinc-950 text-white sm:max-w-[min(92vw,56rem)]">
           {taskModal?.kind === "mandatory" ? (
             (() => {
               const task = tasks.find((t) => t.id === taskModal.taskId)
@@ -783,20 +934,33 @@ export function PhaseTasks({
                   <DialogHeader>
                     <DialogTitle className="uppercase">{task.label}</DialogTitle>
                   </DialogHeader>
-                  <div className="space-y-2 text-sm">
-                    <p className="text-zinc-400">Tarea particular asignada por el director.</p>
-                    {task.link_url ? (
-                      <a
-                        href={task.link_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-purple-300 underline hover:text-purple-200"
-                      >
-                        Ver enlace
-                      </a>
-                    ) : (
-                      <p className="text-zinc-500">Sin enlace.</p>
-                    )}
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
+                      Enlaces de la tarea
+                    </p>
+                    <div className="space-y-1.5 text-sm">
+                      <p className="text-zinc-400">Tarea particular asignada por el director.</p>
+                      {task.link_url?.trim() ? (
+                        <a
+                          href={task.link_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block text-purple-300 underline hover:text-purple-200"
+                        >
+                          Ver enlace del director
+                        </a>
+                      ) : (
+                        <p className="text-zinc-500">Sin enlace de referencia.</p>
+                      )}
+                    </div>
+                    {userEmail ? (
+                      <ParticularTaskDeliverableBlock
+                        userEmail={userEmail}
+                        taskId={task.id}
+                        stored={task.deliverable}
+                        onSaved={() => void fetchParticularTasks()}
+                      />
+                    ) : null}
                   </div>
                 </>
               )

@@ -33,6 +33,7 @@ import {
   DirectorParticularTasksList,
 } from "@/components/director/director-task-progress"
 import { DirectorDeliverablesGoogleGrid } from "@/components/director/director-deliverables-grid"
+import { MandatoryDeliverableHistoryChat } from "@/components/mandatory-deliverable-history-chat"
 import { cn } from "@/lib/utils"
 import { DIRECTOR_TOOLBAR_BUTTON_CLASS } from "@/components/director/director-toolbar-styles"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -67,7 +68,20 @@ type UserDetail = {
     email: string | null
     onboarding_responses: Record<string, string> | null
     mandatory_task_deliverables: Record<string, MandatoryDeliverableRow> | null
+    particular_task_deliverables?: Record<string, MandatoryDeliverableRow> | null
   } | null
+}
+
+const PARTICULAR_DELIVERABLE_SLUG_PREFIX = "particular:"
+
+function isParticularDeliverableSlug(slug: string): boolean {
+  return slug.startsWith(PARTICULAR_DELIVERABLE_SLUG_PREFIX)
+}
+
+function particularIdFromSlug(slug: string): number | null {
+  if (!isParticularDeliverableSlug(slug)) return null
+  const n = parseInt(slug.slice(PARTICULAR_DELIVERABLE_SLUG_PREFIX.length), 10)
+  return Number.isFinite(n) ? n : null
 }
 
 const PHASE_ADVANCE_ORDER = [
@@ -355,16 +369,24 @@ export function DirectorUserDetailView({
   }, [fetchPhaseUnlocks])
 
   useEffect(() => {
-    if (!correctionFor || !detail?.client?.mandatory_task_deliverables) {
+    if (!correctionFor || !detail?.client) {
       setCorrNote("")
       setCorrLink("")
       return
     }
-    const row = detail.client.mandatory_task_deliverables[correctionFor.slug]
+    const row = isParticularDeliverableSlug(correctionFor.slug)
+      ? detail.client.particular_task_deliverables?.[
+          correctionFor.slug.slice(PARTICULAR_DELIVERABLE_SLUG_PREFIX.length)
+        ]
+      : detail.client.mandatory_task_deliverables?.[correctionFor.slug]
     setCorrNote(row?.director_note ?? "")
     setCorrLink(row?.director_link ?? "")
     setCorrErr(null)
-  }, [correctionFor, detail?.client?.mandatory_task_deliverables])
+  }, [
+    correctionFor,
+    detail?.client?.mandatory_task_deliverables,
+    detail?.client?.particular_task_deliverables,
+  ])
 
   const handlePhaseChange = async (newPhase: string) => {
     if (!detail) return
@@ -430,15 +452,29 @@ export function DirectorUserDetailView({
     setCorrErr(null)
     setCorrSaving(true)
     try {
-      const res = await apiFetch("/users/mandatory-deliverables/director-feedback", {
-        method: "PUT",
-        body: JSON.stringify({
-          student_email: email,
-          task_slug: correctionFor.slug,
-          director_note: note || undefined,
-          director_link: link || undefined,
-        }),
-      })
+      const particularId = particularIdFromSlug(correctionFor.slug)
+      const res = await apiFetch(
+        particularId != null
+          ? `/particular-tasks/${particularId}/deliverable/director-feedback`
+          : "/users/mandatory-deliverables/director-feedback",
+        {
+          method: "PUT",
+          body: JSON.stringify(
+            particularId != null
+              ? {
+                  student_email: email,
+                  director_note: note || undefined,
+                  director_link: link || undefined,
+                }
+              : {
+                  student_email: email,
+                  task_slug: correctionFor.slug,
+                  director_note: note || undefined,
+                  director_link: link || undefined,
+                }
+          ),
+        }
+      )
       const data = (await res.json().catch(() => ({}))) as { detail?: string }
       if (!res.ok) {
         setCorrErr(typeof data.detail === "string" ? data.detail : "No se pudo enviar")
@@ -624,13 +660,21 @@ export function DirectorUserDetailView({
                 )}
                 {tab === "entregables" && (
                   <DirectorDeliverablesGoogleGrid
-                    entries={
-                      detail.client.mandatory_task_deliverables
+                    entries={[
+                      ...(detail.client.mandatory_task_deliverables
                         ? Object.entries(detail.client.mandatory_task_deliverables).map(
                             ([slug, row]) => ({ slug, row })
                           )
-                        : []
-                    }
+                        : []),
+                      ...(detail.client.particular_task_deliverables
+                        ? Object.entries(detail.client.particular_task_deliverables).map(
+                            ([id, row]) => ({
+                              slug: `${PARTICULAR_DELIVERABLE_SLUG_PREFIX}${id}`,
+                              row,
+                            })
+                          )
+                        : []),
+                    ]}
                     onRequestCorrection={(slug, label) =>
                       setCorrectionFor({ slug, label })
                     }
@@ -712,8 +756,8 @@ export function DirectorUserDetailView({
               {correctionFor.label}
             </p>
           ) : null}
-          <div className="grid gap-3 py-1 md:grid-cols-2 md:gap-4">
-            <div className="grid gap-3">
+          <div className="grid gap-3 py-1 md:grid-cols-2 md:gap-6 md:items-stretch">
+            <div className="grid min-w-0 gap-3">
               <div className="grid gap-1.5">
                 <Label htmlFor="corr-note-du" className="text-zinc-300 text-xs">
                   Comentario
@@ -739,51 +783,18 @@ export function DirectorUserDetailView({
               </div>
               {corrErr ? <p className="text-sm text-red-400">{corrErr}</p> : null}
             </div>
-            <div className="min-h-0 rounded-md border border-zinc-800 bg-zinc-900/55 p-2.5">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
-                Historial
-              </p>
-              {correctionFor && detail?.client?.mandatory_task_deliverables?.[correctionFor.slug]?.history?.length ? (
-                <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
-                  {(detail.client.mandatory_task_deliverables[correctionFor.slug].history ?? []).map((h, i) => (
-                    <div key={`${h.submitted_at}-${i}`} className="rounded border border-zinc-700/70 bg-zinc-950/60 p-2">
-                      <p className="text-[10px] uppercase tracking-wide text-violet-300 mb-1">Alumno</p>
-                      {h.note ? <p className="text-xs text-zinc-200 whitespace-pre-wrap">{h.note}</p> : null}
-                      {h.link ? (
-                        <a
-                          href={h.link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block text-xs text-violet-300 underline mt-1"
-                        >
-                          Ver entregable
-                        </a>
-                      ) : null}
-                      {h.director_note || h.director_link ? (
-                        <div className="mt-2 rounded border border-amber-500/35 bg-amber-500/10 p-1.5">
-                          <p className="text-[10px] uppercase tracking-wide text-amber-200 mb-0.5">Director</p>
-                          {h.director_note ? (
-                            <p className="text-xs text-amber-50/95 whitespace-pre-wrap">{h.director_note}</p>
-                          ) : null}
-                          {h.director_link ? (
-                            <a
-                              href={h.director_link}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-block text-xs text-amber-200 underline mt-1"
-                            >
-                              Ver enlace
-                            </a>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-zinc-500">Todavía no hay historial para esta tarea.</p>
-              )}
-            </div>
+            <MandatoryDeliverableHistoryChat
+              history={
+                correctionFor && detail?.client
+                  ? isParticularDeliverableSlug(correctionFor.slug)
+                    ? detail.client.particular_task_deliverables?.[
+                        correctionFor.slug.slice(PARTICULAR_DELIVERABLE_SLUG_PREFIX.length)
+                      ]?.history
+                    : detail.client.mandatory_task_deliverables?.[correctionFor.slug]?.history
+                  : undefined
+              }
+              className="min-h-0 min-w-0 border-t border-zinc-600/40 pt-4 md:border-t-0 md:border-l md:pt-0 md:pl-6"
+            />
           </div>
           <DialogFooter className="gap-2">
             <Button

@@ -208,6 +208,7 @@ def get_phase_advance_status(
 @router.put("/client-phase")
 def set_client_phase(
     payload: schemas.ClientPhaseRequest,
+    request: Request,
     current_user=Depends(get_current_user),
 ):
     VALID_PHASES = {
@@ -244,6 +245,11 @@ def set_client_phase(
         # para evitar que el cliente quede atascado en pantalla de espera.
         if current_user.role != Role.CLIENTE and old_phase != payload.phase:
             activation_service.clear_pending_phase_advance_requests(payload.email)
+            em = str(payload.email).strip()
+            loop = request.app.state.loop
+            loop.call_soon_threadsafe(
+                lambda e=em: broadcast_to_user(e, {"type": "new_notification"})
+            )
 
         return {"message": "Fase actualizada correctamente", "success": True}
     except HTTPException as e:

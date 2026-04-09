@@ -14,6 +14,7 @@ import {
   apiFetch,
   setToken as persistToken,
 } from "@/lib/api"
+import { CLIENT_NOTIFICATIONS_CHANGED } from "@/lib/use-client-notifications-sse"
 
 export type UserRole = "client" | "director" | null
 export type ClientPhase = string
@@ -100,23 +101,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [hydrated, isLoggedIn, userRole, clientPhase, userEmail, accessToken])
 
-  // Al refrescar, sincroniza fase real desde backend para clientes.
-  useEffect(() => {
+  const syncClientPhaseFromServer = useCallback(async () => {
     if (!hydrated || !isLoggedIn || userRole !== "client" || !accessToken) return
-    const syncClientPhase = async () => {
-      try {
-        const res = await apiFetch("/users/me/client-phase", { bearerToken: accessToken })
-        if (!res.ok) return
-        const data = (await res.json()) as { phase?: string }
-        if (typeof data.phase === "string" && data.phase && data.phase !== clientPhase) {
-          setClientPhase(data.phase)
-        }
-      } catch {
-        // ignore network errors; UI conserva el estado local
+    try {
+      const res = await apiFetch("/users/me/client-phase", { bearerToken: accessToken })
+      if (!res.ok) return
+      const data = (await res.json()) as { phase?: string }
+      const next = data.phase
+      if (typeof next === "string" && next) {
+        setClientPhase((prev) => (next !== prev ? next : prev))
       }
+    } catch {
+      /* ignore */
     }
-    void syncClientPhase()
-  }, [hydrated, isLoggedIn, userRole, accessToken, clientPhase])
+  }, [hydrated, isLoggedIn, userRole, accessToken])
+
+  /** Montaje y cambio de sesión: alinear fase con el servidor (sin depender de clientPhase en deps). */
+  useEffect(() => {
+    void syncClientPhaseFromServer()
+  }, [syncClientPhaseFromServer])
+
+  /** SSE (notificación / fase tocada por director), foco de ventana: volver a leer fase. */
+  useEffect(() => {
+    if (!hydrated || userRole !== "client") return
+    const onWake = () => void syncClientPhaseFromServer()
+    window.addEventListener(CLIENT_NOTIFICATIONS_CHANGED, onWake)
+    window.addEventListener("focus", onWake)
+    return () => {
+      window.removeEventListener(CLIENT_NOTIFICATIONS_CHANGED, onWake)
+      window.removeEventListener("focus", onWake)
+    }
+  }, [hydrated, userRole, syncClientPhaseFromServer])
 
   const logout = useCallback(() => {
     setIsLoggedIn(false)

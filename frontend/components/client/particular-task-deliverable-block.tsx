@@ -7,68 +7,18 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { MandatoryDeliverableHistoryChat } from "@/components/mandatory-deliverable-history-chat"
-
-export type MandatoryDeliverableEntry = {
-  label: string
-  note: string
-  link: string
-  submitted_at: string
-  director_note?: string
-  director_link?: string
-  corrected_at?: string
-  history?: Array<{
-    note: string
-    link: string
-    submitted_at: string
-    director_note?: string
-    director_link?: string
-    corrected_at?: string
-  }>
-}
-
-/** Parsea un objeto entregable devuelto por la API (obligatoria o particular). */
-export function parseMandatoryDeliverableEntry(
-  raw: unknown
-): MandatoryDeliverableEntry | undefined {
-  if (!raw || typeof raw !== "object" || !("submitted_at" in raw)) return undefined
-  const e = raw as MandatoryDeliverableEntry & Record<string, unknown>
-  if (typeof e.submitted_at !== "string") return undefined
-  const row: MandatoryDeliverableEntry = {
-    label: String(e.label ?? ""),
-    note: String(e.note ?? ""),
-    link: String(e.link ?? ""),
-    submitted_at: e.submitted_at,
-  }
-  if (Array.isArray(e.history)) {
-    row.history = e.history
-      .filter((h): h is Record<string, unknown> => !!h && typeof h === "object")
-      .map((h) => ({
-        note: String(h.note ?? ""),
-        link: String(h.link ?? ""),
-        submitted_at: String(h.submitted_at ?? ""),
-        director_note: typeof h.director_note === "string" ? h.director_note : undefined,
-        director_link: typeof h.director_link === "string" ? h.director_link : undefined,
-        corrected_at: typeof h.corrected_at === "string" ? h.corrected_at : undefined,
-      }))
-  }
-  if (typeof e.director_note === "string" && e.director_note) row.director_note = e.director_note
-  if (typeof e.director_link === "string" && e.director_link) row.director_link = e.director_link
-  if (typeof e.corrected_at === "string" && e.corrected_at) row.corrected_at = e.corrected_at
-  return row
-}
+import type { MandatoryDeliverableEntry } from "@/components/client/mandatory-task-deliverable-block"
 
 type Props = {
   userEmail: string
-  taskSlug: string
-  taskLabel: string
+  taskId: number
   stored: MandatoryDeliverableEntry | undefined
   onSaved: () => void
 }
 
-export function MandatoryTaskDeliverableBlock({
+export function ParticularTaskDeliverableBlock({
   userEmail,
-  taskSlug,
-  taskLabel,
+  taskId,
   stored,
   onSaved,
 }: Props) {
@@ -80,14 +30,14 @@ export function MandatoryTaskDeliverableBlock({
 
   useEffect(() => {
     noteSeededFromStored.current = false
-  }, [taskSlug])
+  }, [taskId])
 
   useEffect(() => {
     if (!stored) return
     if (noteSeededFromStored.current) return
     setNote(stored.note ?? "")
     noteSeededFromStored.current = true
-  }, [stored, taskSlug])
+  }, [stored, taskId])
 
   useEffect(() => {
     setLink(stored?.link ?? "")
@@ -97,12 +47,10 @@ export function MandatoryTaskDeliverableBlock({
     setErr(null)
     setSaving(true)
     try {
-      const res = await apiFetch("/users/mandatory-deliverables", {
+      const res = await apiFetch(`/particular-tasks/${taskId}/deliverable`, {
         method: "PUT",
         body: JSON.stringify({
           email: userEmail,
-          task_slug: taskSlug,
-          task_label: taskLabel,
           note: note.trim() || undefined,
           link: link.trim() || undefined,
         }),
@@ -129,6 +77,8 @@ export function MandatoryTaskDeliverableBlock({
       setSaving(false)
     }
   }
+
+  const idBase = `part-del-${taskId}`
 
   return (
     <div className="mt-3 pt-3 border-t border-zinc-600/40 w-full max-w-full grid grid-cols-1 lg:grid-cols-[1fr_minmax(260px,360px)] gap-6 lg:gap-8 lg:items-stretch">
@@ -175,11 +125,11 @@ export function MandatoryTaskDeliverableBlock({
         ) : null}
         <div className="flex flex-col gap-2">
           <div className="grid gap-1">
-            <Label htmlFor={`del-note-${taskSlug}`} className="text-xs text-zinc-400">
+            <Label htmlFor={`${idBase}-note`} className="text-xs text-zinc-400">
               Comentario (opcional si adjuntás enlace)
             </Label>
             <Textarea
-              id={`del-note-${taskSlug}`}
+              id={`${idBase}-note`}
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
@@ -188,11 +138,11 @@ export function MandatoryTaskDeliverableBlock({
             />
           </div>
           <div className="grid gap-1">
-            <Label htmlFor={`del-link-${taskSlug}`} className="text-xs text-zinc-400">
+            <Label htmlFor={`${idBase}-link`} className="text-xs text-zinc-400">
               Enlace (Drive, Loom, etc.)
             </Label>
             <Input
-              id={`del-link-${taskSlug}`}
+              id={`${idBase}-link`}
               value={link}
               onChange={(e) => setLink(e.target.value)}
               type="text"
@@ -209,7 +159,7 @@ export function MandatoryTaskDeliverableBlock({
             onClick={() => void submit()}
             className="w-full sm:w-auto h-9 bg-purple-600 hover:bg-purple-700 text-white rounded-full border-0 text-xs"
           >
-            {saving ? "Enviando…" : stored ? "Actualizar entregable" : "Enviar entregable"}
+            {saving ? "Enviando…" : stored?.submitted_at ? "Actualizar entregable" : "Enviar entregable"}
           </Button>
         </div>
       </div>

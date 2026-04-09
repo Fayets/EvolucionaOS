@@ -4,6 +4,7 @@ import { AppProvider, useApp } from "@/lib/app-context"
 import { LoginForm } from "@/components/login-form"
 import { ClientView } from "@/components/client/client-view"
 import { DirectorView } from "@/components/director/director-view"
+import { StarfieldBackdrop } from "@/components/space/starfield-backdrop"
 
 function DashboardAtmosphere() {
   return (
@@ -54,6 +55,11 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen" style={{ background: "#060606" }}>
+      {userRole === "client" && (
+        <div className="pointer-events-none fixed inset-0 z-0">
+          <StarfieldBackdrop className="opacity-[0.92]" />
+        </div>
+      )}
       <DashboardAtmosphere />
       <div className="relative z-10">
         {userRole === "director" ? <DirectorView /> : <ClientView />}

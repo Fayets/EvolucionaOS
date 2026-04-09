@@ -93,7 +93,7 @@ export function DirectorDeliverablesGoogleGrid({
     return (
       <p className="text-sm text-zinc-500">
         No hay enlaces de entregas todavía. Cuando el alumno adjunte un enlace en una tarea
-        obligatoria, aparecerá acá como tarjeta.
+        obligatoria o particular, aparecerá acá como tarjeta.
       </p>
     )
   }
