@@ -109,6 +109,7 @@ function emptyAnswersForTemplate(tpl: KpiTemplate): Record<string, string | numb
 
 function ReportesSemanalesPageContent() {
   const { isLoggedIn, userRole } = useApp()
+  const showBroadcastButton = isLoggedIn && userRole === "director"
   const [step, setStep] = useState<1 | 2>(1)
   const [email, setEmail] = useState("")
   const [verifyLoading, setVerifyLoading] = useState(false)
@@ -480,7 +481,12 @@ function ReportesSemanalesPageContent() {
   }
 
   return (
-    <div className="min-h-dvh bg-black px-4 py-10 text-white">
+    <div
+      className={cn(
+        "min-h-dvh bg-black px-4 text-white",
+        step === 1 ? "flex items-center justify-center py-8" : "py-10"
+      )}
+    >
       <div
         className={cn(
           "mx-auto flex w-full flex-col gap-8",
@@ -488,8 +494,13 @@ function ReportesSemanalesPageContent() {
         )}
       >
         <div className="flex w-full justify-center">
-          <div className="flex w-full items-center justify-between gap-3">
-            <div className="relative h-14 w-48 shrink-0">
+          <div
+            className={cn(
+              "flex w-full items-center gap-3",
+              showBroadcastButton ? "justify-between" : "justify-center"
+            )}
+          >
+            <div className={cn("relative shrink-0", step === 1 ? "h-20 w-72" : "h-14 w-48")}>
               <Image
                 src="/EvolucionaLogoLogin.png"
                 alt="Evoluciona"
@@ -499,7 +510,7 @@ function ReportesSemanalesPageContent() {
                 sizes="192px"
               />
             </div>
-            {isLoggedIn && userRole === "director" ? (
+            {showBroadcastButton ? (
               <Button
                 type="button"
                 onClick={() => setBroadcastModalOpen(true)}
@@ -648,7 +659,7 @@ function ReportesSemanalesPageContent() {
         </Dialog>
 
         {step === 1 ? (
-          <Card className="w-full border-zinc-800 bg-zinc-950/90 shadow-xl">
+          <Card className="w-full max-w-lg border-zinc-800 bg-zinc-950/90 shadow-xl">
             <CardHeader>
               <CardTitle className="text-lg text-white">Reporte semanal</CardTitle>
               <CardDescription className="text-zinc-400">
