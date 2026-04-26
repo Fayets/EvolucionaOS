@@ -134,6 +134,34 @@ class ClientService:
             except Exception:
                 raise HTTPException(status_code=500, detail="Error al actualizar fase del cliente")
 
+    def set_discord_webhook_by_user_email(
+        self, user_email: str, discord_webhook_url: str
+    ) -> bool:
+        with db_session:
+            try:
+                email = (user_email or "").strip()
+                webhook = (discord_webhook_url or "").strip()
+                if not email:
+                    raise HTTPException(status_code=400, detail="Email requerido")
+                if not webhook:
+                    raise HTTPException(
+                        status_code=400, detail="Webhook de Discord requerido"
+                    )
+                user = models.User.get(email=email)
+                if not user:
+                    return False
+                client = models.Client.get(user=user)
+                if not client:
+                    client = models.Client(user=user, phase="initial")
+                client.discord_webhook_url = webhook
+                return True
+            except HTTPException:
+                raise
+            except Exception:
+                raise HTTPException(
+                    status_code=500, detail="Error al actualizar webhook de Discord"
+                )
+
     def update_client_initial_data(self, old_email: str, new_email: str, phone: str | None) -> None:
         with db_session:
             try:

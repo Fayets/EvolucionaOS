@@ -60,12 +60,15 @@ type UserDetail = {
   id: number
   email: string
   role: string
+  first_name?: string | null
+  last_name?: string | null
   created_at: string | null
   updated_at: string | null
   client: {
     phase: string
     phone: string | null
     email: string | null
+    discord_webhook_url?: string | null
     onboarding_responses: Record<string, string> | null
     mandatory_task_deliverables: Record<string, MandatoryDeliverableRow> | null
     particular_task_deliverables?: Record<string, MandatoryDeliverableRow> | null
@@ -142,10 +145,12 @@ function timelineIndex(phase: string): number {
   return 0
 }
 
-function displayNameFromEmail(email: string): string {
-  const local = email.split("@")[0] ?? email
-  if (!local) return email
-  return local.charAt(0).toUpperCase() + local.slice(1).toLowerCase()
+function displayNameFromDetail(detail: Pick<UserDetail, "first_name" | "last_name" | "email">): string {
+  const first = (detail.first_name ?? "").trim()
+  const last = (detail.last_name ?? "").trim()
+  const full = [first, last].filter(Boolean).join(" ").trim()
+  if (full) return full
+  return detail.email
 }
 
 let cachedLogoDataUrl: string | null = null
@@ -321,6 +326,8 @@ export function DirectorUserDetailView({
   const [corrErr, setCorrErr] = useState<string | null>(null)
   const [manualPhaseUnlocks, setManualPhaseUnlocks] = useState<Set<string>>(new Set())
   const [phaseUnlocksSaving, setPhaseUnlocksSaving] = useState(false)
+  const [discordWebhookUrl, setDiscordWebhookUrl] = useState("")
+  const [discordWebhookSaving, setDiscordWebhookSaving] = useState(false)
 
   const fetchDetail = useCallback(async () => {
     setLoading(true)
@@ -367,6 +374,10 @@ export function DirectorUserDetailView({
   useEffect(() => {
     void fetchPhaseUnlocks()
   }, [fetchPhaseUnlocks])
+
+  useEffect(() => {
+    setDiscordWebhookUrl(detail?.client?.discord_webhook_url ?? "")
+  }, [detail?.client?.discord_webhook_url])
 
   useEffect(() => {
     if (!correctionFor || !detail?.client) {
@@ -489,6 +500,48 @@ export function DirectorUserDetailView({
     }
   }
 
+  const handleSaveDiscordWebhook = async () => {
+    if (!detail?.client) return
+    const value = discordWebhookUrl.trim()
+    if (!value) {
+      alert("Ingresá un webhook válido de Discord.")
+      return
+    }
+    setDiscordWebhookSaving(true)
+    try {
+      const res = await apiFetch("/users/discord-webhook", {
+        method: "PUT",
+        body: JSON.stringify({
+          user_email: detail.email,
+          discord_webhook_url: value,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean
+        message?: string
+      }
+      if (!res.ok || data.success === false) {
+        alert(data.message || "No se pudo guardar el webhook.")
+        return
+      }
+      setDetail(prev =>
+        prev
+          ? {
+              ...prev,
+              client: prev.client
+                ? { ...prev.client, discord_webhook_url: value }
+                : prev.client,
+            }
+          : prev
+      )
+      alert("Webhook de Discord guardado.")
+    } catch {
+      alert("Error de conexión al guardar webhook.")
+    } finally {
+      setDiscordWebhookSaving(false)
+    }
+  }
+
   const nextPhase = detail?.client ? getNextStoredPhase(detail.client.phase) : null
   const currentProgramIdx = detail?.client
     ? PROGRAM_PHASES.indexOf(normalizeStoredPhase(detail.client.phase) as (typeof PROGRAM_PHASES)[number])
@@ -556,7 +609,7 @@ export function DirectorUserDetailView({
             <div className="relative flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                  {displayNameFromEmail(detail.email)}
+                  {displayNameFromDetail(detail)}
                 </h1>
                 <p className="mt-1 truncate text-sm text-zinc-400">{detail.email}</p>
                 {detail.client?.phone ? (
@@ -565,6 +618,30 @@ export function DirectorUserDetailView({
                 {detail.client?.email && detail.client.email !== detail.email ? (
                   <p className="text-xs text-zinc-500">Email (cliente): {detail.client.email}</p>
                 ) : null}
+                {detail.client && (
+                  <div className="mt-4 flex flex-col gap-2 sm:max-w-xl">
+                    <Label htmlFor="discord-webhook-input" className="text-xs text-zinc-400">
+                      Discord Webhook
+                    </Label>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Input
+                        id="discord-webhook-input"
+                        value={discordWebhookUrl}
+                        onChange={e => setDiscordWebhookUrl(e.target.value)}
+                        placeholder="https://discord.com/api/webhooks/..."
+                        className="h-9 border-zinc-700 bg-zinc-900/90 text-white"
+                      />
+                      <Button
+                        type="button"
+                        disabled={discordWebhookSaving}
+                        onClick={() => void handleSaveDiscordWebhook()}
+                        className="bg-violet-600 text-white hover:bg-violet-500"
+                      >
+                        {discordWebhookSaving ? "Guardando..." : "Guardar"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
               {detail.client && (
                 <div className="flex flex-col gap-2 sm:items-end">

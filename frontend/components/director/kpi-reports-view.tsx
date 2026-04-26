@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { apiFetch } from "@/lib/api"
 import { useApp } from "@/lib/app-context"
 import { Button } from "@/components/ui/button"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -33,6 +36,10 @@ import {
 import { cn } from "@/lib/utils"
 import { downloadKpiReportsPdf, type KpiPdfTemplate } from "@/lib/kpi-export-pdf"
 import { Eye, FileDown, Loader2, Trash2 } from "lucide-react"
+import { toast } from "sonner"
+
+const DEFAULT_BROADCAST_MESSAGE =
+  "📋 **Reporte Semanal**\n\n¡Hola! Es momento de completar el reporte de esta semana 🗓️\n\n👉 https://evoluciona.cloud/reportes-semanales\n\nPor favor completalo antes de las 23:59 hs. ¡Gracias!"
 
 type KpiField = {
   id: string
@@ -58,6 +65,13 @@ type KpiReport = {
   week_start: string
   answers: Record<string, unknown>
   submitted_at: string
+}
+
+type BroadcastClientItem = {
+  email: string
+  first_name?: string | null
+  last_name?: string | null
+  discord_webhook_url?: string | null
 }
 
 function formatKpiAnswerCell(raw: unknown): string {
@@ -182,6 +196,12 @@ export function KpiReportsView() {
   const [deleteLoading, setDeleteLoading] = useState(false)
   const [nameSearch, setNameSearch] = useState("")
   const [sendBulkOpen, setSendBulkOpen] = useState(false)
+  const [bulkMessage, setBulkMessage] = useState(DEFAULT_BROADCAST_MESSAGE)
+  const [bulkLoadingRecipients, setBulkLoadingRecipients] = useState(false)
+  const [bulkSending, setBulkSending] = useState(false)
+  const [bulkWithWebhook, setBulkWithWebhook] = useState<BroadcastClientItem[]>([])
+  const [bulkWithoutWebhook, setBulkWithoutWebhook] = useState<BroadcastClientItem[]>([])
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
   const [viewReport, setViewReport] = useState<KpiReport | null>(null)
 
   const activeTemplate = useMemo(
@@ -318,167 +338,394 @@ export function KpiReportsView() {
 
   const templateForReport = (r: KpiReport) => templates.find((t) => t.id === r.template_id) ?? null
 
+  const displayClientName = (u: BroadcastClientItem): string => {
+    const first = (u.first_name ?? "").trim()
+    const last = (u.last_name ?? "").trim()
+    const full = [first, last].filter(Boolean).join(" ").trim()
+    return full || u.email
+  }
+
+  const loadBulkRecipients = useCallback(async () => {
+    if (!token) return
+    setBulkLoadingRecipients(true)
+    try {
+      const count = 100
+      let page = 1
+      let total = 0
+      const allUsers: BroadcastClientItem[] = []
+      while (page === 1 || allUsers.length < total) {
+        const params = new URLSearchParams({
+          role: "CLIENTE",
+          page: String(page),
+          count: String(count),
+          sort: "created_at",
+          order: "desc",
+        })
+        const res = await apiFetch(`/users?${params.toString()}`, { bearerToken: token })
+        if (!res.ok) throw new Error(`No se pudo cargar usuarios (${res.status})`)
+        const data = (await res.json()) as { total?: number; users?: BroadcastClientItem[] }
+        const users = Array.isArray(data.users) ? data.users : []
+        total = typeof data.total === "number" ? data.total : users.length
+        allUsers.push(...users)
+        if (users.length === 0) break
+        page += 1
+      }
+      const withWebhook = allUsers.filter((u) => (u.discord_webhook_url ?? "").trim().length > 0)
+      const withoutWebhook = allUsers.filter((u) => (u.discord_webhook_url ?? "").trim().length === 0)
+      setBulkWithWebhook(withWebhook)
+      setBulkWithoutWebhook(withoutWebhook)
+      setBulkSelected(new Set(withWebhook.map((u) => u.email)))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudieron cargar destinatarios")
+      setBulkWithWebhook([])
+      setBulkWithoutWebhook([])
+      setBulkSelected(new Set())
+    } finally {
+      setBulkLoadingRecipients(false)
+    }
+  }, [token])
+
+  useEffect(() => {
+    if (!sendBulkOpen) return
+    setBulkMessage(DEFAULT_BROADCAST_MESSAGE)
+    void loadBulkRecipients()
+  }, [sendBulkOpen, loadBulkRecipients])
+
+  const sendBulkReports = async () => {
+    if (!token) return
+    const destinatarios = Array.from(bulkSelected)
+    if (destinatarios.length === 0) return
+    setBulkSending(true)
+    try {
+      const res = await apiFetch("/discord/difundir-reportes", {
+        method: "POST",
+        bearerToken: token,
+        body: JSON.stringify({
+          mensaje: bulkMessage,
+          destinatarios,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        enviados?: number
+        errores?: Array<{ email?: string; error?: string }>
+        detail?: string
+      }
+      if (!res.ok) {
+        toast.error(typeof data.detail === "string" ? data.detail : "No se pudo difundir")
+        return
+      }
+      const enviados = Number(data.enviados ?? 0)
+      const errores = Array.isArray(data.errores) ? data.errores : []
+      if (errores.length > 0) {
+        toast.error(`Se enviaron ${enviados} y hubo ${errores.length} errores.`)
+      } else {
+        toast.success(`Enviado a ${enviados} clientes`)
+      }
+      setSendBulkOpen(false)
+    } catch {
+      toast.error("Error de conexión al difundir reportes")
+    } finally {
+      setBulkSending(false)
+    }
+  }
+
   return (
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col px-2 pb-4 sm:px-3 lg:px-4">
       {directorKpiCardShell(
         <>
-          <div className="flex shrink-0 flex-col gap-4 xl:flex-row xl:items-end xl:justify-between xl:gap-6">
-            <div className="flex min-w-0 flex-1 flex-col gap-3">
-              <p className="text-sm text-zinc-400">
-                {loadingMeta ? "…" : `${submittedThisWeek} / ${clientTotal} clientes enviaron esta semana`}
-                {nameSearch.trim() || reportKindFilter !== "all" ? (
-                  <span className="ml-2 text-zinc-500">
-                    · Mostrando {filteredReports.length} de {reports.length}
-                  </span>
-                ) : null}
-              </p>
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                <div className="min-w-0 flex-1 space-y-1 sm:min-w-[200px] sm:max-w-md">
-                  <Label className="text-xs text-zinc-500" htmlFor="kpi-report-search">
-                    Buscar por nombre o email
+          {sendBulkOpen ? (
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-white">Difusión de reporte semanal</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                  onClick={() => setSendBulkOpen(false)}
+                >
+                  Volver
+                </Button>
+              </div>
+              <div className="space-y-5 rounded-lg border border-zinc-800/80 bg-black/40 p-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-message-view" className="text-zinc-300">
+                    Mensaje
                   </Label>
-                  <Input
-                    id="kpi-report-search"
-                    type="search"
-                    value={nameSearch}
-                    onChange={(e) => setNameSearch(e.target.value)}
-                    placeholder="Ej. María o @dominio.com"
-                    className="border-zinc-700 bg-black/50 text-white placeholder:text-zinc-600"
-                    autoComplete="off"
+                  <Textarea
+                    id="bulk-message-view"
+                    value={bulkMessage}
+                    onChange={(e) => setBulkMessage(e.target.value)}
+                    rows={7}
+                    className="border-zinc-700 bg-zinc-900 text-zinc-100"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-zinc-500">Semana (lunes)</Label>
-                  <Input
-                    type="date"
-                    value={weekFilter}
-                    onChange={(e) => setWeekFilter(mondayISOFromAnyDateInput(e.target.value))}
-                    className="w-[160px] border-zinc-700 bg-black/50 text-white"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-zinc-500">Reporte</Label>
-                  <Select
-                    value={reportKindFilter}
-                    onValueChange={(v) => setReportKindFilter(v as ReportKindFilter)}
-                  >
-                    <SelectTrigger className="w-[220px] border-zinc-700 bg-black/50 text-white">
-                      <SelectValue placeholder="Todos" />
-                    </SelectTrigger>
-                    <SelectContent className="border-zinc-800 bg-zinc-950 text-white">
-                      <SelectItem value="all">Todos</SelectItem>
-                      <SelectItem value="mkt">Marketing</SelectItem>
-                      <SelectItem value="ventas">Ventas</SelectItem>
-                    </SelectContent>
-                  </Select>
+
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label className="text-zinc-300">Destinatarios</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                        onClick={() => setBulkSelected(new Set(bulkWithWebhook.map((u) => u.email)))}
+                        disabled={bulkLoadingRecipients || bulkWithWebhook.length === 0}
+                      >
+                        Seleccionar todos
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                        onClick={() => setBulkSelected(new Set())}
+                        disabled={bulkLoadingRecipients || bulkSelected.size === 0}
+                      >
+                        Deseleccionar todos
+                      </Button>
+                    </div>
+                  </div>
+
+                  <ScrollArea className="h-[420px] rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                    <div className="space-y-2">
+                      {bulkLoadingRecipients ? (
+                        <div className="flex items-center justify-center py-8 text-zinc-400">
+                          <Loader2 className="mr-2 size-4 animate-spin" />
+                          Cargando clientes...
+                        </div>
+                      ) : (
+                        <>
+                          {bulkWithWebhook.map((u) => {
+                            const checked = bulkSelected.has(u.email)
+                            return (
+                              <label
+                                key={`bulk-with-${u.email}`}
+                                className="flex cursor-pointer items-center justify-between rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm text-zinc-100">{displayClientName(u)}</p>
+                                  <p className="truncate text-xs text-zinc-500">{u.email}</p>
+                                </div>
+                                <Checkbox
+                                  checked={checked}
+                                  onCheckedChange={(v) => {
+                                    setBulkSelected((prev) => {
+                                      const next = new Set(prev)
+                                      if (v) next.add(u.email)
+                                      else next.delete(u.email)
+                                      return next
+                                    })
+                                  }}
+                                  className="border-zinc-600 data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500"
+                                />
+                              </label>
+                            )
+                          })}
+
+                          {bulkWithoutWebhook.length > 0 ? (
+                            <>
+                              <p className="pt-2 text-xs uppercase tracking-wide text-zinc-500">Sin webhook</p>
+                              {bulkWithoutWebhook.map((u) => (
+                                <div
+                                  key={`bulk-without-${u.email}`}
+                                  className="flex items-center justify-between rounded-md border border-zinc-900 bg-zinc-950/40 px-3 py-2 opacity-70"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate text-sm text-zinc-400">{displayClientName(u)}</p>
+                                    <p className="truncate text-xs text-zinc-600">{u.email}</p>
+                                  </div>
+                                  <span className="text-[11px] text-zinc-500">Sin webhook configurado</span>
+                                </div>
+                              ))}
+                            </>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  </ScrollArea>
                 </div>
               </div>
-            </div>
-            <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-              <Button
-                type="button"
-                variant="secondary"
-                className="border border-zinc-600 bg-zinc-800/80 text-zinc-100 hover:bg-zinc-700"
-                onClick={() => setSendBulkOpen(true)}
-              >
-                Enviar reportes a todos los usuarios
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={loadingReports || reports.length === 0}
-                className="border border-violet-500/30 bg-violet-950/40 text-violet-100 hover:bg-violet-900/50 disabled:opacity-50"
-                onClick={() => exportPdf()}
-              >
-                Exportar PDF
-              </Button>
-            </div>
-          </div>
-          <div className="mt-4 flex min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-800/80">
-            {loadingReports ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="size-8 animate-spin text-violet-400" />
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-zinc-800 hover:bg-transparent">
-                    <TableHead className="min-w-[200px] text-zinc-300">Cliente</TableHead>
-                    <TableHead className="min-w-[100px] text-zinc-300">Formulario</TableHead>
-                    <TableHead className="text-zinc-300">Semana</TableHead>
-                    <TableHead className="text-zinc-300">Fecha envío</TableHead>
-                    <TableHead className="w-[132px] min-w-[132px] text-right text-zinc-300">Acciones</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredReports.length === 0 ? (
-                    <TableRow className="border-zinc-800">
-                      <TableCell colSpan={5} className="py-10 text-center text-zinc-500">
-                        {reports.length === 0
-                          ? "No hay reportes para los filtros seleccionados."
-                          : reportKindFilter !== "all" && !nameSearch.trim()
-                            ? "Ningún reporte coincide con el filtro seleccionado para la semana."
-                            : "Ningún resultado coincide con la búsqueda o el tipo de reporte."}
-                      </TableCell>
-                    </TableRow>
+
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  className="bg-violet-700 text-white hover:bg-violet-600 disabled:opacity-40"
+                  onClick={() => void sendBulkReports()}
+                  disabled={bulkSending || bulkSelected.size === 0 || bulkLoadingRecipients}
+                >
+                  {bulkSending ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" />
+                      Enviando...
+                    </span>
                   ) : (
-                    filteredReports.map((r) => (
-                      <TableRow key={r.id} className="border-zinc-800">
-                        <TableCell className="text-zinc-200">
-                          <span className="block font-medium">{r.user_name?.trim() || "—"}</span>
-                          <span className="block text-xs text-zinc-500">{r.user_email}</span>
-                        </TableCell>
-                        <TableCell className="max-w-[140px] truncate text-sm text-violet-200/90">
-                          {templateNameById.get(r.template_id) ?? `#${r.template_id}`}
-                        </TableCell>
-                        <TableCell className="text-zinc-400">{r.week_start}</TableCell>
-                        <TableCell className="text-zinc-400 text-xs">
-                          {new Date(r.submitted_at).toLocaleString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-0.5">
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="size-9 text-zinc-400 hover:bg-zinc-800 hover:text-violet-200"
-                              title="Descargar PDF de este envío"
-                              aria-label={`Descargar PDF de ${r.user_email}`}
-                              onClick={() => exportPdfOne(r)}
-                            >
-                              <FileDown className="size-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="size-9 text-zinc-400 hover:bg-zinc-800 hover:text-violet-200"
-                              title="Ver formulario"
-                              aria-label={`Ver formulario de ${r.user_email}`}
-                              onClick={() => setViewReport(r)}
-                            >
-                              <Eye className="size-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="size-9 text-zinc-400 hover:bg-red-950/40 hover:text-red-400"
-                              title="Eliminar reporte"
-                              aria-label={`Eliminar reporte de ${r.user_email}`}
-                              onClick={() => setDeleteTarget(r)}
-                            >
-                              <Trash2 className="size-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                    `Enviar a ${bulkSelected.size} seleccionados`
                   )}
-                </TableBody>
-              </Table>
-            )}
-          </div>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex shrink-0 flex-col gap-4 xl:flex-row xl:items-end xl:justify-between xl:gap-6">
+                <div className="flex min-w-0 flex-1 flex-col gap-3">
+                  <p className="text-sm text-zinc-400">
+                    {loadingMeta ? "…" : `${submittedThisWeek} / ${clientTotal} clientes enviaron esta semana`}
+                    {nameSearch.trim() || reportKindFilter !== "all" ? (
+                      <span className="ml-2 text-zinc-500">
+                        · Mostrando {filteredReports.length} de {reports.length}
+                      </span>
+                    ) : null}
+                  </p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+                    <div className="min-w-0 flex-1 space-y-1 sm:min-w-[200px] sm:max-w-md">
+                      <Label className="text-xs text-zinc-500" htmlFor="kpi-report-search">
+                        Buscar por nombre o email
+                      </Label>
+                      <Input
+                        id="kpi-report-search"
+                        type="search"
+                        value={nameSearch}
+                        onChange={(e) => setNameSearch(e.target.value)}
+                        placeholder="Ej. María o @dominio.com"
+                        className="border-zinc-700 bg-black/50 text-white placeholder:text-zinc-600"
+                        autoComplete="off"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-500">Semana (lunes)</Label>
+                      <Input
+                        type="date"
+                        value={weekFilter}
+                        onChange={(e) => setWeekFilter(mondayISOFromAnyDateInput(e.target.value))}
+                        className="w-[160px] border-zinc-700 bg-black/50 text-white"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-zinc-500">Reporte</Label>
+                      <Select
+                        value={reportKindFilter}
+                        onValueChange={(v) => setReportKindFilter(v as ReportKindFilter)}
+                      >
+                        <SelectTrigger className="w-[220px] border-zinc-700 bg-black/50 text-white">
+                          <SelectValue placeholder="Todos" />
+                        </SelectTrigger>
+                        <SelectContent className="border-zinc-800 bg-zinc-950 text-white">
+                          <SelectItem value="all">Todos</SelectItem>
+                          <SelectItem value="mkt">Marketing</SelectItem>
+                          <SelectItem value="ventas">Ventas</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="border border-zinc-600 bg-zinc-800/80 text-zinc-100 hover:bg-zinc-700"
+                    onClick={() => setSendBulkOpen(true)}
+                  >
+                    Enviar reportes a todos los usuarios
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={loadingReports || reports.length === 0}
+                    className="border border-violet-500/30 bg-violet-950/40 text-violet-100 hover:bg-violet-900/50 disabled:opacity-50"
+                    onClick={() => exportPdf()}
+                  >
+                    Exportar PDF
+                  </Button>
+                </div>
+              </div>
+              <div className="mt-4 flex min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-800/80">
+                {loadingReports ? (
+                  <div className="flex justify-center py-16">
+                    <Loader2 className="size-8 animate-spin text-violet-400" />
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-zinc-800 hover:bg-transparent">
+                        <TableHead className="min-w-[200px] text-zinc-300">Cliente</TableHead>
+                        <TableHead className="min-w-[100px] text-zinc-300">Formulario</TableHead>
+                        <TableHead className="text-zinc-300">Semana</TableHead>
+                        <TableHead className="text-zinc-300">Fecha envío</TableHead>
+                        <TableHead className="w-[132px] min-w-[132px] text-right text-zinc-300">Acciones</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredReports.length === 0 ? (
+                        <TableRow className="border-zinc-800">
+                          <TableCell colSpan={5} className="py-10 text-center text-zinc-500">
+                            {reports.length === 0
+                              ? "No hay reportes para los filtros seleccionados."
+                              : reportKindFilter !== "all" && !nameSearch.trim()
+                                ? "Ningún reporte coincide con el filtro seleccionado para la semana."
+                                : "Ningún resultado coincide con la búsqueda o el tipo de reporte."}
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredReports.map((r) => (
+                          <TableRow key={r.id} className="border-zinc-800">
+                            <TableCell className="text-zinc-200">
+                              <span className="block font-medium">{r.user_name?.trim() || "—"}</span>
+                              <span className="block text-xs text-zinc-500">{r.user_email}</span>
+                            </TableCell>
+                            <TableCell className="max-w-[140px] truncate text-sm text-violet-200/90">
+                              {templateNameById.get(r.template_id) ?? `#${r.template_id}`}
+                            </TableCell>
+                            <TableCell className="text-zinc-400">{r.week_start}</TableCell>
+                            <TableCell className="text-zinc-400 text-xs">
+                              {new Date(r.submitted_at).toLocaleString()}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-0.5">
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-9 text-zinc-400 hover:bg-zinc-800 hover:text-violet-200"
+                                  title="Descargar PDF de este envío"
+                                  aria-label={`Descargar PDF de ${r.user_email}`}
+                                  onClick={() => exportPdfOne(r)}
+                                >
+                                  <FileDown className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-9 text-zinc-400 hover:bg-zinc-800 hover:text-violet-200"
+                                  title="Ver formulario"
+                                  aria-label={`Ver formulario de ${r.user_email}`}
+                                  onClick={() => setViewReport(r)}
+                                >
+                                  <Eye className="size-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="size-9 text-zinc-400 hover:bg-red-950/40 hover:text-red-400"
+                                  title="Eliminar reporte"
+                                  aria-label={`Eliminar reporte de ${r.user_email}`}
+                                  onClick={() => setDeleteTarget(r)}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </div>
+            </>
+          )}
         </>,
         "Reportes semanales",
         "Listado de envíos por semana, búsqueda por nombre o email y exportación a PDF.",
@@ -542,23 +789,6 @@ export function KpiReportsView() {
           {viewReport ? <ViewReportAnswersBody report={viewReport} template={templateForReport(viewReport)} /> : null}
           <DialogFooter>
             <Button type="button" className="bg-zinc-100 text-zinc-900 hover:bg-white" onClick={() => setViewReport(null)}>
-              Cerrar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={sendBulkOpen} onOpenChange={setSendBulkOpen}>
-        <DialogContent className="border-zinc-800 bg-zinc-950 text-white sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Enviar reportes a todos los usuarios</DialogTitle>
-            <DialogDescription className="text-zinc-400">
-              Acá se conectará la automatización para recordar o solicitar el reporte semanal a todos los clientes
-              (email, notificación u otro canal). Por ahora es solo un marcador de lugar.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" className="bg-zinc-100 text-zinc-900 hover:bg-white" onClick={() => setSendBulkOpen(false)}>
               Cerrar
             </Button>
           </DialogFooter>

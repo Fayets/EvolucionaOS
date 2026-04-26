@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from decouple import config
 from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import psycopg2
 from pony.orm import *
 from src.db import db
 from src.controllers.auth_controller import router as auth_router
@@ -15,7 +16,35 @@ from src.controllers.settings_controller import router as settings_router
 from src.controllers.events_controller import router as events_router
 from src.controllers.kpi_controller import router as kpi_router
 from src.controllers.discord_kpi_controller import router as discord_kpi_router
+from src.controllers.discord_broadcast_controller import router as discord_broadcast_router
 
+
+def _ensure_client_discord_webhook_column() -> None:
+    """
+    Proyecto sin Alembic: para esquemas existentes en Postgres, agregamos la
+    columna nueva de forma idempotente antes de generate_mapping.
+    """
+    if config("DB_PROVIDER", default="").strip().lower() != "postgres":
+        return
+    conn = None
+    try:
+        conn = psycopg2.connect(
+            user=config("DB_USER"),
+            password=config("DB_PASS"),
+            host=config("DB_HOST"),
+            database=config("DB_NAME"),
+        )
+        conn.autocommit = True
+        with conn.cursor() as cur:
+            cur.execute(
+                'ALTER TABLE "client" ADD COLUMN IF NOT EXISTS "discord_webhook_url" TEXT'
+            )
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+_ensure_client_discord_webhook_column()
 db.generate_mapping(create_tables=True)
 
 from src.services.kpi_service import (
@@ -84,6 +113,7 @@ api_router.include_router(
 api_router.include_router(settings_router, prefix="/settings", tags=["settings"])
 api_router.include_router(kpi_router, prefix="/kpi", tags=["kpi"])
 api_router.include_router(discord_kpi_router, prefix="/discord", tags=["discord"])
+api_router.include_router(discord_broadcast_router, prefix="/discord", tags=["discord"])
 
 app.include_router(api_router, prefix="/api")
 # SSE fuera de /api: nginx suele proxy_pass largo para streams y cache desactivado.

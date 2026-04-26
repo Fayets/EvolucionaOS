@@ -62,6 +62,11 @@ class ClientPhaseRequest(BaseModel):
     phase: str
 
 
+class ClientDiscordWebhookRequest(BaseModel):
+    user_email: str
+    discord_webhook_url: str
+
+
 class PhaseAdvanceRequest(BaseModel):
     email: EmailStr
     next_phase: str
@@ -266,4 +271,9 @@ class BroadcastKpiResponse(BaseModel):
 
 class KpiChannelsCountResponse(BaseModel):
     channels_registered: int
+
+
+class DiscordBroadcastRequest(BaseModel):
+    mensaje: str
+    destinatarios: list[str] = Field(default_factory=list)
 

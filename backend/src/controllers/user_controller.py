@@ -96,6 +96,24 @@ def update_email(
         return {"message": "Error inesperado al actualizar email.", "success": False}
 
 
+@router.put("/discord-webhook")
+def update_client_discord_webhook(
+    payload: schemas.ClientDiscordWebhookRequest,
+    _staff=Depends(get_staff_user),
+):
+    try:
+        ok = client_service.set_discord_webhook_by_user_email(
+            payload.user_email, payload.discord_webhook_url
+        )
+        if not ok:
+            return {"message": "Usuario no encontrado", "success": False}
+        return {"message": "Webhook de Discord actualizado", "success": True}
+    except HTTPException as e:
+        return {"message": e.detail, "success": False}
+    except Exception:
+        return {"message": "Error inesperado al actualizar webhook.", "success": False}
+
+
 @router.get("/me/client-phase")
 def get_my_client_phase(current_user=Depends(get_current_user)):
     if current_user.role != Role.CLIENTE:

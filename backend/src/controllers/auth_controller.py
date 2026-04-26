@@ -78,10 +78,10 @@ async def register(user: schemas.UserCreate):
     try:
         service.create_user(user)
         return {"message": "Usuario creado correctamente", "success": True}
-    except HTTPException as e:
-        return {"message": e.detail, "success": False}
+    except HTTPException:
+        raise
     except Exception:
-        return {"message": "Error inesperado al crear el usuario.", "success": False}
+        raise HTTPException(status_code=500, detail="Error inesperado al crear el usuario.")
 
 
 @router.post("/login")

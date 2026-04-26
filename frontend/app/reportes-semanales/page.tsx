@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react"
 import Image from "next/image"
-import { apiUrl } from "@/lib/api"
+import { apiFetch, apiUrl } from "@/lib/api"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,16 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -19,6 +29,12 @@ import {
 } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import { Loader2 } from "lucide-react"
+import { AppProvider, useApp } from "@/lib/app-context"
+import { Toaster } from "@/components/ui/sonner"
+import { toast } from "sonner"
+
+const DEFAULT_BROADCAST_MESSAGE =
+  "📋 **Reporte Semanal**\n\n¡Hola! Es momento de completar el reporte de esta semana 🗓️\n\n👉 https://evoluciona.cloud/reportes-semanales\n\nPor favor completalo antes de las 23:59 hs. ¡Gracias!"
 
 type KpiField = {
   id: string
@@ -34,6 +50,13 @@ type KpiTemplate = {
   fields: KpiField[]
   is_active: boolean
   created_at: string
+}
+
+type UserListItem = {
+  email: string
+  first_name?: string | null
+  last_name?: string | null
+  discord_webhook_url?: string | null
 }
 
 function mondayOfCurrentWeekISO(): string {
@@ -84,7 +107,8 @@ function emptyAnswersForTemplate(tpl: KpiTemplate): Record<string, string | numb
   return init
 }
 
-export default function ReportesSemanalesPage() {
+function ReportesSemanalesPageContent() {
+  const { isLoggedIn, userRole } = useApp()
   const [step, setStep] = useState<1 | 2>(1)
   const [email, setEmail] = useState("")
   const [verifyLoading, setVerifyLoading] = useState(false)
@@ -107,6 +131,72 @@ export default function ReportesSemanalesPage() {
   const [submitAllLoading, setSubmitAllLoading] = useState(false)
   const [submitAllError, setSubmitAllError] = useState<string | null>(null)
   const [submitErrorByTemplate, setSubmitErrorByTemplate] = useState<Record<number, string | null>>({})
+  const [broadcastModalOpen, setBroadcastModalOpen] = useState(false)
+  const [broadcastingDiscord, setBroadcastingDiscord] = useState(false)
+  const [loadingRecipients, setLoadingRecipients] = useState(false)
+  const [broadcastMessage, setBroadcastMessage] = useState(DEFAULT_BROADCAST_MESSAGE)
+  const [broadcastClientsWithWebhook, setBroadcastClientsWithWebhook] = useState<UserListItem[]>([])
+  const [broadcastClientsWithoutWebhook, setBroadcastClientsWithoutWebhook] = useState<UserListItem[]>([])
+  const [selectedRecipients, setSelectedRecipients] = useState<Set<string>>(new Set())
+
+  const displayName = (u: UserListItem): string => {
+    const first = (u.first_name ?? "").trim()
+    const last = (u.last_name ?? "").trim()
+    const full = [first, last].filter(Boolean).join(" ").trim()
+    return full || u.email
+  }
+
+  const loadBroadcastRecipients = useCallback(async () => {
+    if (!isLoggedIn || userRole !== "director") return
+    setLoadingRecipients(true)
+    try {
+      const count = 100
+      let page = 1
+      let total = 0
+      const allUsers: UserListItem[] = []
+      while (page === 1 || allUsers.length < total) {
+        const params = new URLSearchParams({
+          role: "CLIENTE",
+          page: String(page),
+          count: String(count),
+          sort: "created_at",
+          order: "desc",
+        })
+        const res = await apiFetch(`/users?${params.toString()}`)
+        if (!res.ok) {
+          throw new Error(`No se pudo cargar usuarios (${res.status})`)
+        }
+        const data = (await res.json()) as { total?: number; users?: UserListItem[] }
+        const users = Array.isArray(data.users) ? data.users : []
+        total = Number(data.total ?? users.length)
+        allUsers.push(...users)
+        if (users.length === 0) break
+        page += 1
+      }
+      const withWebhook = allUsers.filter(
+        u => ((u.discord_webhook_url ?? "").trim().length > 0)
+      )
+      const withoutWebhook = allUsers.filter(
+        u => ((u.discord_webhook_url ?? "").trim().length === 0)
+      )
+      setBroadcastClientsWithWebhook(withWebhook)
+      setBroadcastClientsWithoutWebhook(withoutWebhook)
+      setSelectedRecipients(new Set(withWebhook.map(u => u.email)))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudieron cargar destinatarios")
+      setBroadcastClientsWithWebhook([])
+      setBroadcastClientsWithoutWebhook([])
+      setSelectedRecipients(new Set())
+    } finally {
+      setLoadingRecipients(false)
+    }
+  }, [isLoggedIn, userRole])
+
+  useEffect(() => {
+    if (!broadcastModalOpen) return
+    setBroadcastMessage(DEFAULT_BROADCAST_MESSAGE)
+    void loadBroadcastRecipients()
+  }, [broadcastModalOpen, loadBroadcastRecipients])
 
   const loadStep2Data = useCallback(async (uid: number) => {
     setLoadStep2(true)
@@ -347,6 +437,48 @@ export default function ReportesSemanalesPage() {
     )
   }
 
+  const handleBroadcastWeeklyReport = async () => {
+    if (!isLoggedIn || userRole !== "director") return
+    const recipients = Array.from(selectedRecipients)
+    if (recipients.length === 0) return
+    setBroadcastingDiscord(true)
+    try {
+      const res = await apiFetch("/discord/difundir-reportes", {
+        method: "POST",
+        body: JSON.stringify({
+          mensaje: broadcastMessage,
+          destinatarios: recipients,
+        }),
+      })
+      const data = (await res.json().catch(() => ({}))) as {
+        enviados?: number
+        errores?: Array<{ email?: string; error?: string }>
+        detail?: string
+      }
+      if (!res.ok) {
+        toast.error(
+          typeof data.detail === "string"
+            ? data.detail
+            : "No se pudo difundir el reporte semanal."
+        )
+        return
+      }
+      const enviados = Number(data.enviados ?? 0)
+      const errores = Array.isArray(data.errores) ? data.errores : []
+      if (errores.length > 0) {
+        toast.error(`Se enviaron ${enviados} y hubo ${errores.length} errores.`)
+        setBroadcastModalOpen(false)
+        return
+      }
+      toast.success(`Enviado a ${enviados} clientes`)
+      setBroadcastModalOpen(false)
+    } catch {
+      toast.error("Error de conexión al difundir el reporte semanal.")
+    } finally {
+      setBroadcastingDiscord(false)
+    }
+  }
+
   return (
     <div className="min-h-dvh bg-black px-4 py-10 text-white">
       <div
@@ -356,17 +488,164 @@ export default function ReportesSemanalesPage() {
         )}
       >
         <div className="flex w-full justify-center">
-          <div className="relative h-14 w-48 shrink-0">
-            <Image
-              src="/EvolucionaLogoLogin.png"
-              alt="Evoluciona"
-              fill
-              className="object-contain object-center brightness-0 invert"
-              priority
-              sizes="192px"
-            />
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="relative h-14 w-48 shrink-0">
+              <Image
+                src="/EvolucionaLogoLogin.png"
+                alt="Evoluciona"
+                fill
+                className="object-contain object-center brightness-0 invert"
+                priority
+                sizes="192px"
+              />
+            </div>
+            {isLoggedIn && userRole === "director" ? (
+              <Button
+                type="button"
+                onClick={() => setBroadcastModalOpen(true)}
+                className="bg-violet-700 text-white hover:bg-violet-600"
+              >
+                Enviar reportes a todos los usuarios
+              </Button>
+            ) : null}
           </div>
         </div>
+
+        <Dialog open={broadcastModalOpen} onOpenChange={setBroadcastModalOpen}>
+          <DialogContent className="border-zinc-800 bg-zinc-950 text-white sm:max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Difundir reporte semanal</DialogTitle>
+              <DialogDescription className="text-zinc-400">
+                Editá el mensaje y seleccioná los destinatarios con webhook de Discord.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <Label htmlFor="broadcast-message" className="text-zinc-300">
+                  Mensaje
+                </Label>
+                <Textarea
+                  id="broadcast-message"
+                  value={broadcastMessage}
+                  onChange={e => setBroadcastMessage(e.target.value)}
+                  rows={7}
+                  className="border-zinc-700 bg-zinc-900 text-zinc-100"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Label className="text-zinc-300">Destinatarios</Label>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                      onClick={() =>
+                        setSelectedRecipients(new Set(broadcastClientsWithWebhook.map(u => u.email)))
+                      }
+                      disabled={loadingRecipients || broadcastClientsWithWebhook.length === 0}
+                    >
+                      Seleccionar todos
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-700 bg-zinc-900 text-zinc-100 hover:bg-zinc-800"
+                      onClick={() => setSelectedRecipients(new Set())}
+                      disabled={loadingRecipients || selectedRecipients.size === 0}
+                    >
+                      Deseleccionar todos
+                    </Button>
+                  </div>
+                </div>
+
+                <ScrollArea className="h-[320px] rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                  <div className="space-y-2">
+                    {loadingRecipients ? (
+                      <div className="flex items-center justify-center py-8 text-zinc-400">
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                        Cargando clientes...
+                      </div>
+                    ) : (
+                      <>
+                        {broadcastClientsWithWebhook.map((u) => {
+                          const checked = selectedRecipients.has(u.email)
+                          return (
+                            <label
+                              key={`with-${u.email}`}
+                              className="flex cursor-pointer items-center justify-between rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2"
+                            >
+                              <div className="min-w-0">
+                                <p className="truncate text-sm text-zinc-100">{displayName(u)}</p>
+                                <p className="truncate text-xs text-zinc-500">{u.email}</p>
+                              </div>
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(v) => {
+                                  setSelectedRecipients((prev) => {
+                                    const next = new Set(prev)
+                                    if (v) next.add(u.email)
+                                    else next.delete(u.email)
+                                    return next
+                                  })
+                                }}
+                                className="border-zinc-600 data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-500"
+                              />
+                            </label>
+                          )
+                        })}
+
+                        {broadcastClientsWithoutWebhook.length > 0 ? (
+                          <>
+                            <p className="pt-2 text-xs uppercase tracking-wide text-zinc-500">
+                              Sin webhook
+                            </p>
+                            {broadcastClientsWithoutWebhook.map((u) => (
+                              <div
+                                key={`without-${u.email}`}
+                                className="flex items-center justify-between rounded-md border border-zinc-900 bg-zinc-950/40 px-3 py-2 opacity-70"
+                              >
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm text-zinc-400">{displayName(u)}</p>
+                                  <p className="truncate text-xs text-zinc-600">{u.email}</p>
+                                </div>
+                                <span className="text-[11px] text-zinc-500">
+                                  Sin webhook configurado
+                                </span>
+                              </div>
+                            ))}
+                          </>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                onClick={() => void handleBroadcastWeeklyReport()}
+                disabled={broadcastingDiscord || selectedRecipients.size === 0 || loadingRecipients}
+                className="bg-violet-700 text-white hover:bg-violet-600 disabled:opacity-40"
+              >
+                {broadcastingDiscord ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="size-4 animate-spin" />
+                    Enviando...
+                  </span>
+                ) : (
+                  `Enviar a ${selectedRecipients.size} seleccionados`
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {step === 1 ? (
           <Card className="w-full border-zinc-800 bg-zinc-950/90 shadow-xl">
@@ -568,5 +847,14 @@ export default function ReportesSemanalesPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function ReportesSemanalesPage() {
+  return (
+    <AppProvider>
+      <ReportesSemanalesPageContent />
+      <Toaster />
+    </AppProvider>
   )
 }

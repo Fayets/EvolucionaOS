@@ -5,7 +5,6 @@ import { useCallback, useEffect, useState } from "react"
 import { apiFetch } from "@/lib/api"
 import { useApp } from "@/lib/app-context"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Loader2, Plus } from "lucide-react"
 import { directorKpiCardShell } from "./kpi-reports-view"
 
@@ -49,23 +48,13 @@ export function KpiFormulariosView() {
     void refreshTemplates()
   }, [refreshTemplates])
 
-  const activateTemplate = async (id: number) => {
-    if (!token) return
-    const res = await apiFetch(`/kpi/templates/${id}/activate`, {
-      method: "PATCH",
-      bearerToken: token,
-    })
-    if (!res.ok) return
-    await refreshTemplates()
-  }
-
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 pb-10">
       {directorKpiCardShell(
         <div className="space-y-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-zinc-400">
-              Gestioná las plantillas que usan los reportes semanales públicos (Venta y Mkt).
+              Gestioná las plantillas que alimentan los reportes semanales (Venta y Mkt).
             </p>
             <Button type="button" size="sm" className="shrink-0 gap-1 bg-violet-600 text-white hover:bg-violet-500" asChild>
               <Link href="/kpi-plantillas/nueva">
@@ -93,14 +82,6 @@ export function KpiFormulariosView() {
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    <Badge variant={t.is_active ? "default" : "secondary"}>
-                      {t.is_active ? "Activo" : "Inactivo"}
-                    </Badge>
-                    {!t.is_active ? (
-                      <Button type="button" size="sm" variant="outline" onClick={() => void activateTemplate(t.id)}>
-                        Activar
-                      </Button>
-                    ) : null}
                     <Button type="button" size="sm" variant="ghost" className="text-zinc-200 hover:text-white" asChild>
                       <Link href={`/kpi-plantillas/${t.id}`}>Editar</Link>
                     </Button>
@@ -114,7 +95,7 @@ export function KpiFormulariosView() {
           )}
         </div>,
         "Formularios KPI",
-        "Definí campos, activá la versión que quieras exponer y editá desde la vista dedicada."
+        "Definí campos y editá cada formulario desde su vista dedicada."
       )}
     </div>
   )

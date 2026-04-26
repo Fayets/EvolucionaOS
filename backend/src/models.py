@@ -38,6 +38,7 @@ class Client(db.Entity):
     phase = Required(str)
     phone = Optional(str)
     email = Optional(str)
+    discord_webhook_url = Optional(str)
     # JSON: dict con respuestas del formulario de onboarding (claves q1, q2, ...)
     onboarding_responses = Optional(str)
     # JSON: { task_slug: { label, note, link, submitted_at } } entregables por tarea obligatoria

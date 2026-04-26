@@ -23,6 +23,7 @@ export function RegisterUserForm({ embedded, onRegistered }: RegisterUserFormPro
   const [firstName, setFirstName] = useState("")
   const [lastName, setLastName] = useState("")
   const [role, setRole] = useState<RoleOption>("CLIENTE")
+  const [emailManuallyEdited, setEmailManuallyEdited] = useState(false)
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null)
   const [loading, setLoading] = useState(false)
 
@@ -48,11 +49,17 @@ export function RegisterUserForm({ embedded, onRegistered }: RegisterUserFormPro
       const data = await res.json().catch(() => null)
 
       if (!res.ok || !data?.success) {
+        const detailText =
+          data && typeof data === "object" && "detail" in data && typeof data.detail === "string"
+            ? data.detail
+            : null
         setMessage({
           type: "err",
           text:
             typeof data?.message === "string"
               ? data.message
+              : detailText
+                ? detailText
               : "No se pudo registrar el usuario.",
         })
         return
@@ -67,6 +74,7 @@ export function RegisterUserForm({ embedded, onRegistered }: RegisterUserFormPro
       setFirstName("")
       setLastName("")
       setRole("CLIENTE")
+      setEmailManuallyEdited(false)
       onRegistered?.()
     } catch {
       setMessage({
@@ -90,14 +98,15 @@ export function RegisterUserForm({ embedded, onRegistered }: RegisterUserFormPro
                 onChange={e => {
                   const value = e.target.value
                   setFirstName(value)
-                  if (value) {
+                  if (value && !emailManuallyEdited) {
                     setEmail(`${value.toLowerCase()}@${role.toLowerCase()}.com`)
-                  } else {
+                  } else if (!value && !emailManuallyEdited) {
                     setEmail("")
                   }
                 }}
                 placeholder="Nombre"
                 className="h-11 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500"
+                required
               />
             </div>
 
@@ -124,7 +133,7 @@ export function RegisterUserForm({ embedded, onRegistered }: RegisterUserFormPro
                 onChange={e => {
                   const value = e.target.value as RoleOption
                   setRole(value)
-                  if (firstName) {
+                  if (firstName && !emailManuallyEdited) {
                     setEmail(`${firstName.toLowerCase()}@${value.toLowerCase()}.com`)
                   }
                 }}
@@ -147,7 +156,10 @@ export function RegisterUserForm({ embedded, onRegistered }: RegisterUserFormPro
                 type="email"
                 autoComplete="email"
                 value={email}
-                readOnly
+                onChange={e => {
+                  setEmail(e.target.value)
+                  setEmailManuallyEdited(true)
+                }}
                 placeholder="nombre@rol.com"
                 className="h-11 bg-zinc-900 border-zinc-700 text-white placeholder:text-zinc-500"
                 required

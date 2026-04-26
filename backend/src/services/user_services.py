@@ -10,33 +10,36 @@ logger = logging.getLogger(__name__)
 
 class UsersService:
 
-    def create_user(self, user: schemas.UserCreate) -> schemas.UserRead:
+    def create_user(self, user: schemas.UserCreate) -> None:
         with db_session:
             try:
-                role_value = Role(user.role.value)
+                first_name = (user.firstName or "").strip()
+                last_name = (user.lastName or "").strip()
+                if not first_name:
+                    raise HTTPException(status_code=400, detail="El nombre es obligatorio")
+                try:
+                    role_value = Role(user.role.value)
+                except ValueError:
+                    raise HTTPException(status_code=400, detail="Rol inválido")
                 entity = models.User(
-                    email=user.email,
+                    email=str(user.email),
                     password_hash=_hash_password(user.password),
                     role=role_value,
-                    first_name=user.firstName or None,
-                    last_name=user.lastName or None,
+                    first_name=first_name,
+                    # En algunas bases existentes la columna quedó NOT NULL.
+                    # Mantenemos "apellido opcional" guardando string vacío.
+                    last_name=last_name or "",
                 )
                 entity.flush()
                 # Ficha de cliente: sin esto get_user_detail devuelve client: null y el panel del director queda “vacío”.
                 if role_value == Role.CLIENTE:
                     models.Client(user=entity, phase="initial")
-                return schemas.UserRead(
-                    id=entity.id,
-                    email=entity.email,
-                    role=user.role,
-                    created_at=entity.created_at,
-                    updated_at=entity.updated_at,
-                )
             except HTTPException:
                 raise
             except TransactionIntegrityError:
                 raise HTTPException(status_code=400, detail="Email ya registrado")
             except Exception:
+                logger.exception("create_user")
                 raise HTTPException(status_code=500, detail="Error al crear el usuario")
 
     def _apply_user_sort(self, query, sort: str | None, order: str | None):
@@ -83,10 +86,12 @@ class UsersService:
                 users_conversion = []
                 for user in users:
                     client_phase = None
+                    discord_webhook_url = None
                     if user.role == Role.CLIENTE:
                         client = models.Client.get(user=user)
                         if client is not None:
                             client_phase = client.phase
+                            discord_webhook_url = client.discord_webhook_url
                     users_conversion.append(
                         {
                             "id": user.id,
@@ -97,6 +102,7 @@ class UsersService:
                             "created_at": user.created_at.isoformat() if user.created_at else None,
                             "updated_at": user.updated_at.isoformat() if user.updated_at else None,
                             "client_phase": client_phase,
+                            "discord_webhook_url": discord_webhook_url,
                         }
                     )
 
@@ -149,6 +155,8 @@ class UsersService:
                     "id": user.id,
                     "email": user.email,
                     "role": str(user.role),
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
                     "created_at": user.created_at.isoformat() if user.created_at else None,
                     "updated_at": user.updated_at.isoformat() if user.updated_at else None,
                 }
@@ -174,6 +182,7 @@ class UsersService:
                         "phase": client.phase,
                         "phone": client.phone,
                         "email": client.email,
+                        "discord_webhook_url": client.discord_webhook_url,
                         "onboarding_responses": _parse_json(client.onboarding_responses),
                         "mandatory_task_deliverables": md,
                         "particular_task_deliverables": particular_deliverables,

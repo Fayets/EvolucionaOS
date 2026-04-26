@@ -116,7 +116,7 @@ function userMatchesPhaseFilter(
 const PHASE_FILTER_ALL = "__all__"
 
 const usersListScrollClass =
-  "min-h-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] max-h-[min(22rem,45vh)]"
+  "min-h-0 overflow-y-auto overflow-x-hidden [scrollbar-gutter:stable] max-h-[min(22rem,45vh)] pr-1 [scrollbar-width:thin] [scrollbar-color:rgb(63_63_70)_rgb(10_10_10)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:rounded-full [&::-webkit-scrollbar-track]:bg-zinc-950 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-zinc-700 [&::-webkit-scrollbar-thumb:hover]:bg-zinc-600"
 
 export function RegisteredUsersList() {
   const { users, removeUser, listLoading, listFetchFailed, refreshFromServer } =
