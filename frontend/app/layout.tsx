@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono"
  */
 export const metadata: Metadata = {
   title: "Evoluciona",
-  description: "Conquista tus metas cada semana.",
+  description: "",
   appleWebApp: {
     capable: true,
     title: "Evoluciona",

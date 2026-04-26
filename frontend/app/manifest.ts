@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Evoluciona",
     short_name: "Evoluciona",
-    description: "Conquista tus metas cada semana.",
+    description: "",
     start_url: "/",
     display: "standalone",
     background_color: "#000000",
